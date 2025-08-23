@@ -1,0 +1,14 @@
+{
+  "name": "Hide System Icons",
+  "description": "Hide system icons in the Quick Settings panel for GNOME.",
+  "uuid": "hide-system-icons@shichen35.github.io",
+  "url": "https://github.com/shichen35/hide-system-icons",
+  "settings-schema": "org.gnome.shell.extensions.hide-system-icons",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49"
+  ]
+}

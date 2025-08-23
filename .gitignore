@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+
+
+*.compiled
+*.zip
+.env
+.env.*
+
+.vscode/
+
+# npm and yarn debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
