@@ -1,0 +1,27 @@
+{
+  "name": "hide-system-icons",
+  "version": "0.0.1",
+  "description": "A GNOME Extension to hide system icons in the Quick Settings panel.",
+  "type": "module",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shichen35/hide-system-icons.git"
+  },
+  "author": "Chen Shi <shichen35@gmail.com>",
+  "license": "LGPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/shichen35/hide-system-icons/issues"
+  },
+  "homepage": "https://github.com/shichen35/hide-system-icons#readme",
+  "sideEffects": false,
+  "devDependencies": {
+    "eslint": "^9.33.0",
+    "eslint-plugin-jsdoc": "^54.1.0",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@girs/gjs": "^4.0.0-beta.34",
+    "@girs/gnome-shell": "^48.0.4"
+  }
+}

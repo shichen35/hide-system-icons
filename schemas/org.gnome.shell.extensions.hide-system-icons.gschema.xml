@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.hide-system-icons" path="/org/gnome/shell/extensions/hide-system-icons/">
+    <key name="hide-volume" type="b">
+      <default>false</default>
+      <summary>Hide volume icon</summary>
+      <description>If toggled, hides the volume icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-network" type="b">
+      <default>false</default>
+      <summary>Hide network icon</summary>
+      <description>If toggled, hides the network icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-power" type="b">
+      <default>false</default>
+      <summary>Hide power icon</summary>
+      <description>If toggled, hides the power icon in the Quick Settings panel.</description>
+    </key>
+  </schema>
+</schemalist>
