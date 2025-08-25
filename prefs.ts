@@ -3,10 +3,8 @@ import Gio from 'gi://Gio';
 import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 export default class HideSystemIconsPreferences extends ExtensionPreferences {
-  _settings?: Gio.Settings
-
   fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {
-    this._settings = this.getSettings();
+    const settings = this.getSettings();
 
     const page = new Adw.PreferencesPage({
       title: _('General'),
@@ -38,11 +36,11 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
     });
     iconsGroup.add(hidePower);
 
-    window.add(page)
+    window.add(page);
 
-    this._settings!.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
-    this._settings!.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
-    this._settings!.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
 
     return Promise.resolve();
   }

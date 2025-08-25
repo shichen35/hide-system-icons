@@ -72,7 +72,7 @@ export default class HideVolume extends Extension {
     if (this.settings) {
       for (const id of this.settingsSignalIds) this.settings.disconnect(id);
       this.settingsSignalIds = [];
-      this.settings = null;
+     this.settings = null;
     }
 
     // Restore and cleanup indicators
