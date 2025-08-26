@@ -2,9 +2,15 @@
 
 Hide specific system icons from the GNOME Quick Settings panel.
 
-- Compatible with GNOME Shell 45–49
-- UUID: `hide-system-icons@shichen35.github.io`
-- Install path: `~/.local/share/gnome-shell/extensions/hide-system-icons@shichen35.github.io`
+![Screenshot](screenshots/screenshot.png)
+
+## Install
+
+Install from GNOME Extensions: [Hide System Icons](https://extensions.gnome.org/extension/8558/hide-system-icons/)
+
+## Compatibility
+
+- GNOME Shell 45–49
 
 ## Features
 
@@ -15,22 +21,30 @@ Hide specific system icons from the GNOME Quick Settings panel.
 
 ## Settings
 
-- GSettings schema: `org.gnome.shell.extensions.hide-system-icons`
+Preferences: Extensions app → this extension → Preferences. Available toggles:
+- Hide volume icon
+- Hide network icon
+- Hide power icon
+
+GSettings (advanced):
+- Schema: `org.gnome.shell.extensions.hide-system-icons`
 - Keys:
   - `hide-volume` (boolean)
   - `hide-network` (boolean)
   - `hide-power` (boolean)
 
-A Preferences window is provided (Extensions app → this extension → Preferences) with three toggles:
-- Hide volume icon
-- Hide network icon
-- Hide power icon
+## Manual installation (from source)
 
-## Installation (from source)
-
-Prereqs: make, zip, glib-compile-schemas, Node.js + npm
+Prerequisites:
+- make, zip, glib-compile-schemas
+- Node.js and npm
 
 ```bash
 npm install
 make pack
 make install
+```
+
+## License
+
+MIT — see `LICENSE`.
