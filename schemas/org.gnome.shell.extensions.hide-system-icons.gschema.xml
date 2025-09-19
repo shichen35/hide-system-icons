@@ -16,5 +16,10 @@
       <summary>Hide power icon</summary>
       <description>If toggled, hides the power icon in the Quick Settings panel.</description>
     </key>
+    <key name="hide-bluetooth" type="b">
+      <default>false</default>
+      <summary>Hide Bluetooth icon</summary>
+      <description>If toggled, hides the Bluetooth icon in the Quick Settings panel.</description>
+    </key>
   </schema>
 </schemalist>
