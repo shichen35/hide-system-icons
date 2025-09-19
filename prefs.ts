@@ -24,6 +24,12 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
     });
     iconsGroup.add(hideNetwork);
 
+    const hideBluetooth = new Adw.SwitchRow({
+      title: _('Hide Bluetooth'),
+      subtitle: _('Hide the Bluetooth indicator.'),
+    });
+    iconsGroup.add(hideBluetooth);
+
     const hideVolume = new Adw.SwitchRow({
       title: _('Hide volume'),
       subtitle: _('Hide the volume indicator.'),
@@ -39,6 +45,7 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
     window.add(page);
 
     settings.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-bluetooth', hideBluetooth, 'active', Gio.SettingsBindFlags.DEFAULT);
     settings.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
     settings.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
 

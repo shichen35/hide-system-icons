@@ -17,10 +17,12 @@ export default class HideVolume extends Extension {
   private volumeOutput: Hideable | null = null;
   private network: Hideable | null = null;
   private power: Hideable | null = null;
+  private bluetooth: Hideable | null = null;
 
   private showSignalVolume: number | null = null;
   private showSignalNetwork: number | null = null;
   private showSignalPower: number | null = null;
+  private showSignalBluetooth: number | null = null;
 
   private settingsSignalIds: number[] = [];
   private indicatorsContainer: any | null = null;
@@ -40,17 +42,22 @@ export default class HideVolume extends Extension {
     this.settingsSignalIds.push(
       this.settings.connect("changed::hide-power", () => this.updatePower()),
     );
+    this.settingsSignalIds.push(
+      this.settings.connect("changed::hide-bluetooth", () => this.updateBluetooth()),
+    );
 
     this.sourceId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
       const qs = Main.panel.statusArea.quickSettings as unknown as {
         _volumeOutput?: Hideable | null;
         _network?: Hideable | null;
         _system?: Hideable | null;
+        _bluetooth?: Hideable | null;
       };
 
       this.volumeOutput = (qs._volumeOutput ?? null) as Hideable | null;
       this.network = (qs._network ?? null) as Hideable | null;
       this.power = (qs._system ?? null) as Hideable | null;
+      this.bluetooth = (qs._bluetooth ?? null) as Hideable | null;
 
       if (!this.volumeOutput || !this.network || !this.power)
         return GLib.SOURCE_CONTINUE;
@@ -59,6 +66,7 @@ export default class HideVolume extends Extension {
       this.updateVolume();
       this.updateNetwork();
       this.updatePower();
+      this.updateBluetooth();
 
       // Watch for Quick Settings rebuilds and re-apply settings when needed
       this.attachRebuildWatch();
@@ -88,9 +96,10 @@ export default class HideVolume extends Extension {
     this.cleanupIndicator(this.volumeOutput, 'volume');
     this.cleanupIndicator(this.network, 'network');
     this.cleanupIndicator(this.power, 'power');
+    this.cleanupIndicator(this.bluetooth, 'bluetooth');
   }
 
-  private cleanupIndicator(indicator: Hideable | null, kind: 'volume' | 'network' | 'power'): void {
+  private cleanupIndicator(indicator: Hideable | null, kind: 'volume' | 'network' | 'power' | 'bluetooth'): void {
     if (!indicator) return;
     const signalId = this.getSignalId(kind);
     if (signalId !== null) {
@@ -101,18 +110,21 @@ export default class HideVolume extends Extension {
     if (kind === 'volume') this.volumeOutput = null;
     if (kind === 'network') this.network = null;
     if (kind === 'power') this.power = null;
+    if (kind === 'bluetooth') this.bluetooth = null;
   }
 
-  private getSignalId(kind: 'volume' | 'network' | 'power'): number | null {
+  private getSignalId(kind: 'volume' | 'network' | 'power' | 'bluetooth'): number | null {
     if (kind === 'volume') return this.showSignalVolume;
     if (kind === 'network') return this.showSignalNetwork;
-    return this.showSignalPower;
+    if (kind === 'power') return this.showSignalPower;
+    return this.showSignalBluetooth;
   }
 
-  private setSignalId(kind: 'volume' | 'network' | 'power', id: number | null): void {
+  private setSignalId(kind: 'volume' | 'network' | 'power' | 'bluetooth', id: number | null): void {
     if (kind === 'volume') this.showSignalVolume = id;
     else if (kind === 'network') this.showSignalNetwork = id;
-    else this.showSignalPower = id;
+    else if (kind === 'power') this.showSignalPower = id;
+    else this.showSignalBluetooth = id;
   }
 
   private refreshIndicators(): void {
@@ -122,11 +134,13 @@ export default class HideVolume extends Extension {
       _system?: Hideable | null;
       _indicators?: any | null;
       _grid?: any | null;
+      _bluetooth?: Hideable | null;
     };
 
     const newVolume = (qs._volumeOutput ?? null) as Hideable | null;
     const newNetwork = (qs._network ?? null) as Hideable | null;
     const newPower = (qs._system ?? null) as Hideable | null;
+    const newBluetooth = (qs._bluetooth ?? null) as Hideable | null;
 
     if (newVolume !== this.volumeOutput) {
       if (this.volumeOutput && this.showSignalVolume !== null) {
@@ -150,6 +164,14 @@ export default class HideVolume extends Extension {
         this.showSignalPower = null;
       }
       this.power = newPower;
+    }
+
+    if (newBluetooth !== this.bluetooth) {
+      if (this.bluetooth && this.showSignalBluetooth !== null) {
+        this.bluetooth.disconnect(this.showSignalBluetooth);
+        this.showSignalBluetooth = null;
+      }
+      this.bluetooth = newBluetooth;
     }
 
     // Track the container used by Quick Settings to detect rebuilds
@@ -192,9 +214,11 @@ export default class HideVolume extends Extension {
     const hideVol = this.settings?.get_boolean('hide-volume') ?? false;
     const hideNet = this.settings?.get_boolean('hide-network') ?? false;
     const hidePow = this.settings?.get_boolean('hide-power') ?? false;
+    const hideBt = this.settings?.get_boolean('hide-bluetooth') ?? false;
     this.applyHide(this.volumeOutput, hideVol, 'volume');
     this.applyHide(this.network, hideNet, 'network');
     this.applyHide(this.power, hidePow, 'power');
+    this.applyHide(this.bluetooth, hideBt, 'bluetooth');
   }
 
   private updateVolume(): void {
@@ -215,7 +239,13 @@ export default class HideVolume extends Extension {
     this.applyHide(this.power, hide, 'power');
   }
 
-  private applyHide(indicator: Hideable | null, hide: boolean, kind: 'volume' | 'network' | 'power'): void {
+  private updateBluetooth(): void {
+    this.refreshIndicators();
+    const hide = this.settings?.get_boolean('hide-bluetooth') ?? false;
+    this.applyHide(this.bluetooth, hide, 'bluetooth');
+  }
+
+  private applyHide(indicator: Hideable | null, hide: boolean, kind: 'volume' | 'network' | 'power' | 'bluetooth'): void {
     if (!indicator) return;
     const existing = this.getSignalId(kind);
     if (hide) {
