@@ -1,5 +1,6 @@
 node_modules/
 dist/
+legacy-dist/
 .DS_Store
 
 

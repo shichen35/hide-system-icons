@@ -1,0 +1,14 @@
+{
+  "name": "Hide System Icons",
+  "description": "Hide system icons in the Quick Settings (GNOME 43–44) or Aggregate Menu (GNOME 40–42).",
+  "uuid": "hide-system-icons@shichen35.github.io",
+  "url": "https://github.com/shichen35/hide-system-icons",
+  "settings-schema": "org.gnome.shell.extensions.hide-system-icons",
+  "shell-version": [
+    "40",
+    "41",
+    "42",
+    "43",
+    "44"
+  ]
+}
