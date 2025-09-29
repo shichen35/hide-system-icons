@@ -16,57 +16,41 @@ const ExtensionUtils = imports.misc.extensionUtils;
  */
 function doHide(target) {
   if (!target) return;
-  try {
-    if (typeof target.hide === 'function') {
-      target.hide();
-    } else if (target.actor && typeof target.actor.hide === 'function') {
-      target.actor.hide();
-    }
-  } catch (e) {
-    log(`[hide-system-icons] hide failed: ${e}`);
+  if (typeof target.hide === 'function') {
+    target.hide();
+  } else if (target.actor && typeof target.actor.hide === 'function') {
+    target.actor.hide();
   }
 }
 
 function doShow(target) {
   if (!target) return;
-  try {
-    if (typeof target.show === 'function') {
-      target.show();
-    } else if (target.actor && typeof target.actor.show === 'function') {
-      target.actor.show();
-    }
-  } catch (e) {
-    log(`[hide-system-icons] show failed: ${e}`);
+  if (typeof target.show === 'function') {
+    target.show();
+  } else if (target.actor && typeof target.actor.show === 'function') {
+    target.actor.show();
   }
 }
 
 function connectVisibleNotify(target, callback) {
   // On QS indicators, connect on the object; on aggregate items, connect on actor
-  try {
-    if (target && typeof target.connect === 'function') {
-      return target.connect('notify::visible', callback);
-    }
-    if (target && target.actor && typeof target.actor.connect === 'function') {
-      return target.actor.connect('notify::visible', callback);
-    }
-  } catch (e) {
-    log(`[hide-system-icons] connect failed: ${e}`);
+  if (target && typeof target.connect === 'function') {
+    return target.connect('notify::visible', callback);
+  }
+  if (target && target.actor && typeof target.actor.connect === 'function') {
+    return target.actor.connect('notify::visible', callback);
   }
   return 0;
 }
 
 function disconnectSignal(target, id) {
   if (!id) return;
-  try {
-    if (target && typeof target.disconnect === 'function') {
-      target.disconnect(id);
-      return;
-    }
-    if (target && target.actor && typeof target.actor.disconnect === 'function') {
-      target.actor.disconnect(id);
-    }
-  } catch (e) {
-    log(`[hide-system-icons] disconnect failed: ${e}`);
+  if (target && typeof target.disconnect === 'function') {
+    target.disconnect(id);
+    return;
+  }
+  if (target && target.actor && typeof target.actor.disconnect === 'function') {
+    target.actor.disconnect(id);
   }
 }
 
@@ -138,9 +122,7 @@ function disable() {
 
   if (settings) {
     for (const id of settingsSignalIds) {
-      try {
-        settings.disconnect(id);
-      } catch (e) {}
+      settings.disconnect(id);
     }
   }
   settingsSignalIds = [];
@@ -162,18 +144,16 @@ function refreshIndicators() {
 
     // Fallback: scan properties by name if still missing
     const findByName = (obj, names) => {
-      try {
-        const keys = Object.keys(obj || {});
-        const lowerNames = names.map(n => String(n).toLowerCase());
-        for (const k of keys) {
-          const kl = k.toLowerCase();
-          if (lowerNames.some(n => kl.includes(n))) {
-            const val = obj[k];
-            if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
-              return val;
-          }
+      const keys = Object.keys(obj || {});
+      const lowerNames = names.map(n => String(n).toLowerCase());
+      for (const k of keys) {
+        const kl = k.toLowerCase();
+        if (lowerNames.some(n => kl.includes(n))) {
+          const val = obj[k];
+          if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
+            return val;
         }
-      } catch (e) {}
+      }
       return null;
     };
 
@@ -212,19 +192,17 @@ function refreshIndicators() {
 
     // GNOME 40–41 fallbacks: scan aggregateMenu properties for best match
     const findByName = (names) => {
-      try {
-        const keys = Object.keys(agg || {});
-        const lowerNames = names.map(n => String(n).toLowerCase());
-        for (const k of keys) {
-          const kl = k.toLowerCase();
-          if (lowerNames.some(n => kl.includes(n))) {
-            const val = agg[k];
-            if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function'))) {
-              return val;
-            }
+      const keys = Object.keys(agg || {});
+      const lowerNames = names.map(n => String(n).toLowerCase());
+      for (const k of keys) {
+        const kl = k.toLowerCase();
+        if (lowerNames.some(n => kl.includes(n))) {
+          const val = agg[k];
+          if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function'))) {
+            return val;
           }
         }
-      } catch (e) {}
+      }
       return null;
     };
 
@@ -253,11 +231,11 @@ function attachRebuildWatch() {
 function detachRebuildWatch() {
   if (container) {
     if (addedHandler) {
-      try { container.disconnect(addedHandler); } catch (e) {}
+      container.disconnect(addedHandler);
       addedHandler = 0;
     }
     if (removedHandler) {
-      try { container.disconnect(removedHandler); } catch (e) {}
+      container.disconnect(removedHandler);
       removedHandler = 0;
     }
   }

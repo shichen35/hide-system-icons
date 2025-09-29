@@ -4,53 +4,29 @@
 
 const { Gio, Gtk } = imports.gi;
 const Gettext = imports.gettext;
-let Adw = null;
-let Handy = null;
-
-try {
-  Adw = imports.gi.Adw;
-} catch (e) {
-  Adw = null;
-}
-
-if (!Adw) {
-  try {
-    Handy = imports.gi.Handy;
-  } catch (e) {
-    Handy = null;
-  }
-}
 const ExtensionUtils = imports.misc.extensionUtils;
+const Config = imports.misc.config;
+
+// GNOME Shell version check
+const SHELL_MAJOR = parseInt((Config.PACKAGE_VERSION || '0').split('.')[0]);
+const Adw = SHELL_MAJOR >= 42 ? imports.gi.Adw : null;
 
 let _ = (s) => s;
 
 function init() {
   const md = ExtensionUtils.getCurrentExtension().metadata || {};
   const domain = md.uuid;
-  try {
-    ExtensionUtils.initTranslations(domain);
-  } catch (e) {}
-
+  ExtensionUtils.initTranslations.(domain);
   if (typeof ExtensionUtils.gettext === 'function') {
     _ = ExtensionUtils.gettext;
   } else {
-    try {
-      _ = Gettext.domain(domain).gettext;
-    } catch (e) {
-      _ = (s) => s;
-    }
-  }
-
-  // Initialize the available preference toolkit
-  if (Adw && typeof Adw.init === 'function') {
-    try { Adw.init(); } catch (e) {}
-  } else if (Handy && typeof Handy.init === 'function') {
-    try { Handy.init(); } catch (e) {}
+    const dom = typeof Gettext.domain === 'function' ? Gettext.domain(domain) : null;
+    _ = dom && typeof dom.gettext === 'function' ? dom.gettext : ((s) => s);
   }
 }
 
 function _createSwitchRow(label, subtitle) {
-  // Prefer libadwaita widgets, fall back to libhandy/Gtk when unavailable.
+  // Prefer libadwaita widgets, fall back to Gtk when unavailable.
   if (Adw) {
     const row = new Adw.ActionRow({
       title: label,
@@ -64,21 +40,7 @@ function _createSwitchRow(label, subtitle) {
     return { row, toggle };
   }
 
-  if (Handy) {
-    const row = new Handy.ActionRow({
-      title: label,
-      subtitle: subtitle || '',
-    });
-
-    const toggle = new Gtk.Switch({ halign: Gtk.Align.END, valign: Gtk.Align.CENTER });
-    if (typeof row.add_suffix === 'function') row.add_suffix(toggle);
-    if ('activatable_widget' in row) row.activatable_widget = toggle;
-    else if (typeof row.set_activatable_widget === 'function') row.set_activatable_widget(toggle);
-
-    return { row, toggle };
-  }
-
-  // Plain Gtk fallback for GNOME 40–41 when neither toolkit is available.
+  // Plain Gtk fallback for GNOME 40–41 when Adw is unavailable.
   const row = new Gtk.ListBoxRow();
   const content = new Gtk.Box({
     orientation: Gtk.Orientation.HORIZONTAL,
@@ -141,16 +103,6 @@ function _createPreferencesContainers() {
   if (Adw) {
     const page = new Adw.PreferencesPage();
     const group = new Adw.PreferencesGroup({
-      title: _('Quick Settings icons'),
-      description: _('Hide icons in the Quick Settings panel.'),
-    });
-    page.add(group);
-    return { page, group };
-  }
-
-  if (Handy) {
-    const page = new Handy.PreferencesPage();
-    const group = new Handy.PreferencesGroup({
       title: _('Quick Settings icons'),
       description: _('Hide icons in the Quick Settings panel.'),
     });
