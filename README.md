@@ -15,27 +15,30 @@ Install from GNOME Extensions: [Hide System Icons](https://extensions.gnome.org/
 
 ## Features
 
-- Hide network icon
+- Hide microphone icon
 - Hide volume icon
-- Hide power icon
 - Hide Bluetooth icon
+- Hide network icon
+- Hide power icon
 - Changes apply immediately and persist across restarts
 
 ## Settings
 
 Preferences: Extensions app → this extension → Preferences. Available toggles:
+- Hide microphone icon
 - Hide volume icon
+- Hide Bluetooth icon
 - Hide network icon
 - Hide power icon
-- Hide Bluetooth icon
 
 GSettings (advanced):
 - Schema: `org.gnome.shell.extensions.hide-system-icons`
 - Keys:
+  - `hide-microphone` (boolean)
   - `hide-volume` (boolean)
+  - `hide-bluetooth` (boolean)
   - `hide-network` (boolean)
   - `hide-power` (boolean)
-  - `hide-bluetooth` (boolean)
 
 ## Manual installation (from source)
 
