@@ -10,21 +10,21 @@ interface Hideable {
   disconnect(handlerId: number): void;
 }
 
-export default class HideVolume extends Extension {
+export default class HideSystemIcons extends Extension {
   private sourceId: number | null = null;
   private settings: Gio.Settings | null = null;
 
+  private microphone: Hideable | null = null;
   private volumeOutput: Hideable | null = null;
+  private bluetooth: Hideable | null = null;
   private network: Hideable | null = null;
   private power: Hideable | null = null;
-  private bluetooth: Hideable | null = null;
-  private microphone: Hideable | null = null;
 
+  private showSignalMicrophone: number | null = null;
   private showSignalVolume: number | null = null;
+  private showSignalBluetooth: number | null = null;
   private showSignalNetwork: number | null = null;
   private showSignalPower: number | null = null;
-  private showSignalBluetooth: number | null = null;
-  private showSignalMicrophone: number | null = null;
 
   private settingsSignalIds: number[] = [];
   private indicatorsContainer: any | null = null;
@@ -36,7 +36,13 @@ export default class HideVolume extends Extension {
 
     // React to settings changes
     this.settingsSignalIds.push(
+      this.settings.connect("changed::hide-microphone", () => this.updateMicrophone()),
+    );
+    this.settingsSignalIds.push(
       this.settings.connect("changed::hide-volume", () => this.updateVolume()),
+    );
+    this.settingsSignalIds.push(
+      this.settings.connect("changed::hide-bluetooth", () => this.updateBluetooth()),
     );
     this.settingsSignalIds.push(
       this.settings.connect("changed::hide-network", () => this.updateNetwork()),
@@ -44,37 +50,31 @@ export default class HideVolume extends Extension {
     this.settingsSignalIds.push(
       this.settings.connect("changed::hide-power", () => this.updatePower()),
     );
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-bluetooth", () => this.updateBluetooth()),
-    );
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-microphone", () => this.updateMicrophone()),
-    );
 
     this.sourceId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
       const qs = Main.panel.statusArea.quickSettings as unknown as {
+        _volumeInput?: Hideable | null;
         _volumeOutput?: Hideable | null;
+        _bluetooth?: Hideable | null;
         _network?: Hideable | null;
         _system?: Hideable | null;
-        _bluetooth?: Hideable | null;
       };
 
+      this.microphone = (qs._volumeInput ?? null) as Hideable | null;
       this.volumeOutput = (qs._volumeOutput ?? null) as Hideable | null;
+      this.bluetooth = (qs._bluetooth ?? null) as Hideable | null;
       this.network = (qs._network ?? null) as Hideable | null;
       this.power = (qs._system ?? null) as Hideable | null;
-      this.bluetooth = (qs._bluetooth ?? null) as Hideable | null;
-      // @ts-ignore
-      this.microphone = (qs._volumeInput ?? null) as Hideable | null;
 
-      if (!this.volumeOutput || !this.network || !this.power)
+      if (!this.microphone || !this.volumeOutput || !this.bluetooth || !this.network || !this.power)
         return GLib.SOURCE_CONTINUE;
 
       // Apply initial states according to settings
+      this.updateMicrophone();
       this.updateVolume();
+      this.updateBluetooth();
       this.updateNetwork();
       this.updatePower();
-      this.updateBluetooth();
-      this.updateMicrophone();
 
       // Watch for Quick Settings rebuilds and re-apply settings when needed
       this.attachRebuildWatch();
@@ -101,11 +101,11 @@ export default class HideVolume extends Extension {
     this.detachRebuildWatch();
 
     // Restore and cleanup indicators
+    this.cleanupIndicator(this.microphone, 'microphone');
     this.cleanupIndicator(this.volumeOutput, 'volume');
+    this.cleanupIndicator(this.bluetooth, 'bluetooth');
     this.cleanupIndicator(this.network, 'network');
     this.cleanupIndicator(this.power, 'power');
-    this.cleanupIndicator(this.bluetooth, 'bluetooth');
-    this.cleanupIndicator(this.microphone, 'microphone');
   }
 
   private cleanupIndicator(indicator: Hideable | null, kind: 'volume' | 'network' | 'power' | 'bluetooth' | 'microphone'): void {
@@ -116,45 +116,54 @@ export default class HideVolume extends Extension {
       this.setSignalId(kind, null);
     }
     indicator.show();
+    if (kind === 'microphone') this.microphone = null;
     if (kind === 'volume') this.volumeOutput = null;
+    if (kind === 'bluetooth') this.bluetooth = null;
     if (kind === 'network') this.network = null;
     if (kind === 'power') this.power = null;
-    if (kind === 'bluetooth') this.bluetooth = null;
-    if (kind === 'microphone') this.microphone = null;
   }
 
-  private getSignalId(kind: 'volume' | 'network' | 'power' | 'bluetooth' | 'microphone'): number | null {
+  private getSignalId(kind: 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' ): number | null {
+    if (kind === 'microphone') return this.showSignalMicrophone;
     if (kind === 'volume') return this.showSignalVolume;
+    if (kind === 'bluetooth') return this.showSignalBluetooth;
     if (kind === 'network') return this.showSignalNetwork;
     if (kind === 'power') return this.showSignalPower;
-    if (kind === 'bluetooth') return this.showSignalBluetooth;
-    return this.showSignalMicrophone;
+    return null;
   }
 
-  private setSignalId(kind: 'volume' | 'network' | 'power' | 'bluetooth' | 'microphone', id: number | null): void {
-    if (kind === 'volume') this.showSignalVolume = id;
+  private setSignalId(kind: 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' , id: number | null): void {
+    if (kind === 'microphone') this.showSignalMicrophone = id;
+    else if (kind === 'volume') this.showSignalVolume = id;
+    else if (kind === 'bluetooth') this.showSignalBluetooth = id;
     else if (kind === 'network') this.showSignalNetwork = id;
     else if (kind === 'power') this.showSignalPower = id;
-    else if (kind === 'bluetooth') this.showSignalBluetooth = id;
-    else this.showSignalMicrophone = id;
   }
 
   private refreshIndicators(): void {
     const qs = Main.panel.statusArea.quickSettings as unknown as {
+      _volumeInput?: Hideable | null;
       _volumeOutput?: Hideable | null;
+      _bluetooth?: Hideable | null;
       _network?: Hideable | null;
       _system?: Hideable | null;
       _indicators?: any | null;
       _grid?: any | null;
-      _bluetooth?: Hideable | null;
-      _volumeInput?: Hideable | null;
     };
 
+    const newMicrophone = (qs._volumeInput ?? null) as Hideable | null;
     const newVolume = (qs._volumeOutput ?? null) as Hideable | null;
+    const newBluetooth = (qs._bluetooth ?? null) as Hideable | null;
     const newNetwork = (qs._network ?? null) as Hideable | null;
     const newPower = (qs._system ?? null) as Hideable | null;
-    const newBluetooth = (qs._bluetooth ?? null) as Hideable | null;
-    const newMicrophone = (qs._volumeInput ?? null) as Hideable | null;
+
+    if (newMicrophone !== this.microphone) {
+      if (this.microphone && this.showSignalMicrophone !== null) {
+        this.microphone.disconnect(this.showSignalMicrophone);
+        this.showSignalMicrophone = null;
+      }
+      this.microphone = newMicrophone;
+    }
 
     if (newVolume !== this.volumeOutput) {
       if (this.volumeOutput && this.showSignalVolume !== null) {
@@ -162,6 +171,14 @@ export default class HideVolume extends Extension {
         this.showSignalVolume = null;
       }
       this.volumeOutput = newVolume;
+    }
+
+    if (newBluetooth !== this.bluetooth) {
+      if (this.bluetooth && this.showSignalBluetooth !== null) {
+        this.bluetooth.disconnect(this.showSignalBluetooth);
+        this.showSignalBluetooth = null;
+      }
+      this.bluetooth = newBluetooth;
     }
 
     if (newNetwork !== this.network) {
@@ -178,22 +195,6 @@ export default class HideVolume extends Extension {
         this.showSignalPower = null;
       }
       this.power = newPower;
-    }
-
-    if (newBluetooth !== this.bluetooth) {
-      if (this.bluetooth && this.showSignalBluetooth !== null) {
-        this.bluetooth.disconnect(this.showSignalBluetooth);
-        this.showSignalBluetooth = null;
-      }
-      this.bluetooth = newBluetooth;
-    }
-
-    if (newMicrophone !== this.microphone) {
-      if (this.microphone && this.showSignalMicrophone !== null) {
-        this.microphone.disconnect(this.showSignalMicrophone);
-        this.showSignalMicrophone = null;
-      }
-      this.microphone = newMicrophone;
     }
 
     // Track the container used by Quick Settings to detect rebuilds
@@ -233,22 +234,34 @@ export default class HideVolume extends Extension {
 
   private reapplyAll(): void {
     this.refreshIndicators();
+    const hideMic = this.settings?.get_boolean('hide-microphone') ?? false;
     const hideVol = this.settings?.get_boolean('hide-volume') ?? false;
+    const hideBt = this.settings?.get_boolean('hide-bluetooth') ?? false;
     const hideNet = this.settings?.get_boolean('hide-network') ?? false;
     const hidePow = this.settings?.get_boolean('hide-power') ?? false;
-    const hideBt = this.settings?.get_boolean('hide-bluetooth') ?? false;
-    const hideMic = this.settings?.get_boolean('hide-microphone') ?? false;
+    this.applyHide(this.microphone, hideMic, 'microphone');
     this.applyHide(this.volumeOutput, hideVol, 'volume');
+    this.applyHide(this.bluetooth, hideBt, 'bluetooth');
     this.applyHide(this.network, hideNet, 'network');
     this.applyHide(this.power, hidePow, 'power');
-    this.applyHide(this.bluetooth, hideBt, 'bluetooth');
-    this.applyHide(this.microphone, hideMic, 'microphone');
+  }
+
+  private updateMicrophone(): void {
+    this.refreshIndicators();
+    const hide = this.settings?.get_boolean('hide-microphone') ?? false;
+    this.applyHide(this.microphone, hide, 'microphone');
   }
 
   private updateVolume(): void {
     this.refreshIndicators();
     const hide = this.settings?.get_boolean('hide-volume') ?? false;
     this.applyHide(this.volumeOutput, hide, 'volume');
+  }
+
+  private updateBluetooth(): void {
+    this.refreshIndicators();
+    const hide = this.settings?.get_boolean('hide-bluetooth') ?? false;
+    this.applyHide(this.bluetooth, hide, 'bluetooth');
   }
 
   private updateNetwork(): void {
@@ -261,18 +274,6 @@ export default class HideVolume extends Extension {
     this.refreshIndicators();
     const hide = this.settings?.get_boolean('hide-power') ?? false;
     this.applyHide(this.power, hide, 'power');
-  }
-
-  private updateBluetooth(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-bluetooth') ?? false;
-    this.applyHide(this.bluetooth, hide, 'bluetooth');
-  }
-
-  private updateMicrophone(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-microphone') ?? false;
-    this.applyHide(this.microphone, hide, 'microphone');
   }
 
   private applyHide(indicator: Hideable | null, hide: boolean, kind: 'volume' | 'network' | 'power' | 'bluetooth' | 'microphone'): void {

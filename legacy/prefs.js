@@ -16,7 +16,7 @@ let _ = (s) => s;
 function init() {
   const md = ExtensionUtils.getCurrentExtension().metadata || {};
   const domain = md.uuid;
-  ExtensionUtils.initTranslations.(domain);
+  ExtensionUtils.initTranslations(domain);
   if (typeof ExtensionUtils.gettext === 'function') {
     _ = ExtensionUtils.gettext;
   } else {
@@ -79,9 +79,10 @@ function buildPrefsWidget() {
   const { page, group } = _createPreferencesContainers();
 
   const rows = [
-    _createSwitchRow(_('Hide network'), _('Hide the network indicator.')),
-    _createSwitchRow(_('Hide Bluetooth'), _('Hide the Bluetooth indicator.')),
+    _createSwitchRow(_('Hide microphone'), _('Hide the microphone indicator.')),
     _createSwitchRow(_('Hide volume'), _('Hide the volume indicator.')),
+    _createSwitchRow(_('Hide Bluetooth'), _('Hide the Bluetooth indicator.')),
+    _createSwitchRow(_('Hide network'), _('Hide the network indicator.')),
     _createSwitchRow(_('Hide power'), _('Hide the power indicator.')),
   ];
 
@@ -89,11 +90,12 @@ function buildPrefsWidget() {
     group.add(row);
   }
 
-  const [net, bt, vol, pow] = rows.map(r => r.toggle);
+  const [mic, vol, bt, net, pow] = rows.map(r => r.toggle);
 
-  settings.bind('hide-network', net, 'active', Gio.SettingsBindFlags.DEFAULT);
-  settings.bind('hide-bluetooth', bt, 'active', Gio.SettingsBindFlags.DEFAULT);
+  settings.bind('hide-microphone', mic, 'active', Gio.SettingsBindFlags.DEFAULT);
   settings.bind('hide-volume', vol, 'active', Gio.SettingsBindFlags.DEFAULT);
+  settings.bind('hide-bluetooth', bt, 'active', Gio.SettingsBindFlags.DEFAULT);
+  settings.bind('hide-network', net, 'active', Gio.SettingsBindFlags.DEFAULT);
   settings.bind('hide-power', pow, 'active', Gio.SettingsBindFlags.DEFAULT);
 
   return page;

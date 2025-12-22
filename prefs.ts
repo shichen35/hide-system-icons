@@ -18,17 +18,11 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
     });
     page.add(iconsGroup);
 
-    const hideNetwork = new Adw.SwitchRow({
-      title: _('Hide network'),
-      subtitle: _('Hide the network indicator.'),
+    const hideMicrophone = new Adw.SwitchRow({
+      title: _('Hide microphone'),
+      subtitle: _('Hide the microphone indicator.'),
     });
-    iconsGroup.add(hideNetwork);
-
-    const hideBluetooth = new Adw.SwitchRow({
-      title: _('Hide Bluetooth'),
-      subtitle: _('Hide the Bluetooth indicator.'),
-    });
-    iconsGroup.add(hideBluetooth);
+    iconsGroup.add(hideMicrophone);
 
     const hideVolume = new Adw.SwitchRow({
       title: _('Hide volume'),
@@ -36,25 +30,31 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
     });
     iconsGroup.add(hideVolume);
 
+    const hideBluetooth = new Adw.SwitchRow({
+      title: _('Hide Bluetooth'),
+      subtitle: _('Hide the Bluetooth indicator.'),
+    });
+    iconsGroup.add(hideBluetooth);
+
+    const hideNetwork = new Adw.SwitchRow({
+      title: _('Hide network'),
+      subtitle: _('Hide the network indicator.'),
+    });
+    iconsGroup.add(hideNetwork);
+
     const hidePower = new Adw.SwitchRow({
       title: _('Hide power'),
       subtitle: _('Hide the power indicator.'),
     });
     iconsGroup.add(hidePower);
 
-    const hideMicrophone = new Adw.SwitchRow({
-      title: _('Hide microphone'),
-      subtitle: _('Hide the microphone indicator.'),
-    });
-    iconsGroup.add(hideMicrophone);
-
     window.add(page);
 
-    settings.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-bluetooth', hideBluetooth, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
     settings.bind('hide-microphone', hideMicrophone, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-bluetooth', hideBluetooth, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
 
     return Promise.resolve();
   }

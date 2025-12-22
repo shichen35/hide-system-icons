@@ -59,16 +59,18 @@ let idleSource = 0;
 let settingsSignalIds = [];
 
 // Indicators (either QS items or AggregateMenu children)
+let microphoneIndicator = null;
 let volumeIndicator = null;
+let bluetoothIndicator = null;
 let networkIndicator = null;
 let powerIndicator = null;
-let bluetoothIndicator = null;
 
 // Signal IDs for re-hiding when external code toggles visibility
+let sigMicrophone = 0;
 let sigVolume = 0;
+let sigBluetooth = 0;
 let sigNetwork = 0;
 let sigPower = 0;
-let sigBluetooth = 0;
 
 // Rebuild watchers (QS containers only)
 let container = null;
@@ -82,14 +84,18 @@ function enable() {
   settingsSignalIds = [];
 
   // React to settings changes
+  settingsSignalIds.push(settings.connect('changed::hide-microphone', updateMicrophone));
   settingsSignalIds.push(settings.connect('changed::hide-volume', updateVolume));
+  settingsSignalIds.push(settings.connect('changed::hide-bluetooth', updateBluetooth));
   settingsSignalIds.push(settings.connect('changed::hide-network', updateNetwork));
   settingsSignalIds.push(settings.connect('changed::hide-power', updatePower));
-  settingsSignalIds.push(settings.connect('changed::hide-bluetooth', updateBluetooth));
 
   // Defer initial binding until the panel finishes building
   idleSource = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
     refreshIndicators();
+    // Only require core indicators that are guaranteed to exist.
+    // Microphone may not exist on GNOME 40–42 (Aggregate Menu), and
+    // Bluetooth may be absent on systems without Bluetooth hardware.
     if (!volumeIndicator || !networkIndicator || !powerIndicator) {
       return GLib.SOURCE_CONTINUE;
     }
@@ -115,10 +121,11 @@ function disable() {
   detachRebuildWatch();
 
   // Show indicators back and disconnect signals
+  cleanupIndicator('microphone');
   cleanupIndicator('volume');
+  cleanupIndicator('bluetooth');
   cleanupIndicator('network');
   cleanupIndicator('power');
-  cleanupIndicator('bluetooth');
 
   if (settings) {
     for (const id of settingsSignalIds) {
@@ -137,10 +144,11 @@ function refreshIndicators() {
   if (isQuickSettingsAvailable()) {
     const qs = Main.panel.statusArea.quickSettings;
     // Private fields vary by release; guard all lookups and provide fallbacks
+    let microphoneCandidate = qs._volumeInput ?? null;
     let volumeCandidate = qs._volumeOutput ?? qs._volume ?? qs._volumeItem ?? null;
+    let bluetoothCandidate = qs._bluetooth ?? qs._bluetoothItem ?? null;
     let networkCandidate = qs._network ?? qs._networkItem ?? null;
     let powerCandidate = qs._system ?? qs._power ?? qs._powerItem ?? null;
-    let bluetoothCandidate = qs._bluetooth ?? qs._bluetoothItem ?? null;
 
     // Fallback: scan properties by name if still missing
     const findByName = (obj, names) => {
@@ -157,19 +165,22 @@ function refreshIndicators() {
       return null;
     };
 
+    if (!microphoneCandidate)
+      microphoneCandidate = findByName(qs, ['volumeinput', 'microphone', 'mic', 'input']);
     if (!volumeCandidate)
       volumeCandidate = findByName(qs, ['volume', 'audio', 'sound']);
+    if (!bluetoothCandidate)
+      bluetoothCandidate = findByName(qs, ['bluetooth', 'bt']);
     if (!networkCandidate)
       networkCandidate = findByName(qs, ['network', 'net', 'wifi', 'wireless']);
     if (!powerCandidate)
       powerCandidate = findByName(qs, ['power', 'system', 'battery']);
-    if (!bluetoothCandidate)
-      bluetoothCandidate = findByName(qs, ['bluetooth', 'bt']);
 
+    replaceIndicator('microphone', microphoneCandidate);
     replaceIndicator('volume', volumeCandidate);
+    replaceIndicator('bluetooth', bluetoothCandidate);
     replaceIndicator('network', networkCandidate);
     replaceIndicator('power', powerCandidate);
-    replaceIndicator('bluetooth', bluetoothCandidate);
 
     // Track container for rebuilds (43–44 have _indicators; sometimes _grid)
     const newContainer = qs._indicators ?? qs._grid ?? qs._box ?? null;
@@ -186,9 +197,9 @@ function refreshIndicators() {
 
     // Try known children; guard all lookups.
     let volumeCandidate = agg._volume ?? agg._volumeItem ?? null;
+    let bluetoothCandidate = agg._bluetooth ?? agg._bluetoothItem ?? null;
     let networkCandidate = agg._network ?? agg._networkItem ?? null;
     let powerCandidate = agg._power ?? agg._powerItem ?? null;
-    let bluetoothCandidate = agg._bluetooth ?? agg._bluetoothItem ?? null;
 
     // GNOME 40–41 fallbacks: scan aggregateMenu properties for best match
     const findByName = (names) => {
@@ -206,19 +217,22 @@ function refreshIndicators() {
       return null;
     };
 
+    // Note: microphone indicator may not exist in GNOME 40–42 Aggregate Menu
+    let microphoneCandidate = findByName(['volumeinput', 'microphone', 'mic', 'input']);
     if (!volumeCandidate)
       volumeCandidate = findByName(['volume', 'audio', 'sound']);
+    if (!bluetoothCandidate)
+      bluetoothCandidate = findByName(['bluetooth', 'bt']);
     if (!networkCandidate)
       networkCandidate = findByName(['network', 'net', 'wifi', 'wireless']);
     if (!powerCandidate)
       powerCandidate = findByName(['power', 'battery']);
-    if (!bluetoothCandidate)
-      bluetoothCandidate = findByName(['bluetooth', 'bt']);
 
+    replaceIndicator('microphone', microphoneCandidate);
     replaceIndicator('volume', volumeCandidate);
+    replaceIndicator('bluetooth', bluetoothCandidate);
     replaceIndicator('network', networkCandidate);
     replaceIndicator('power', powerCandidate);
-    replaceIndicator('bluetooth', bluetoothCandidate);
   }
 }
 
@@ -252,33 +266,37 @@ function cleanupIndicator(kind) {
 
 function getIndicatorAndSignal(kind) {
   switch (kind) {
+    case 'microphone':
+      return { indicator: microphoneIndicator, signalId: sigMicrophone };
     case 'volume':
       return { indicator: volumeIndicator, signalId: sigVolume };
+    case 'bluetooth':
+      return { indicator: bluetoothIndicator, signalId: sigBluetooth };
     case 'network':
       return { indicator: networkIndicator, signalId: sigNetwork };
     case 'power':
       return { indicator: powerIndicator, signalId: sigPower };
-    case 'bluetooth':
-      return { indicator: bluetoothIndicator, signalId: sigBluetooth };
   }
   return { indicator: null, signalId: 0 };
 }
 
 function setIndicator(kind, value) {
   switch (kind) {
+    case 'microphone': microphoneIndicator = value; break;
     case 'volume': volumeIndicator = value; break;
+    case 'bluetooth': bluetoothIndicator = value; break;
     case 'network': networkIndicator = value; break;
     case 'power': powerIndicator = value; break;
-    case 'bluetooth': bluetoothIndicator = value; break;
   }
 }
 
 function setSignal(kind, id) {
   switch (kind) {
+    case 'microphone': sigMicrophone = id; break;
     case 'volume': sigVolume = id; break;
+    case 'bluetooth': sigBluetooth = id; break;
     case 'network': sigNetwork = id; break;
     case 'power': sigPower = id; break;
-    case 'bluetooth': sigBluetooth = id; break;
   }
 }
 
@@ -296,16 +314,18 @@ function replaceIndicator(kind, newIndicator) {
 
 function reapplyAll() {
   refreshIndicators();
+  applyHide('microphone', settings?.get_boolean('hide-microphone'));
   applyHide('volume', settings?.get_boolean('hide-volume'));
+  applyHide('bluetooth', settings?.get_boolean('hide-bluetooth'));
   applyHide('network', settings?.get_boolean('hide-network'));
   applyHide('power', settings?.get_boolean('hide-power'));
-  applyHide('bluetooth', settings?.get_boolean('hide-bluetooth'));
 }
 
+function updateMicrophone() { refreshIndicators(); applyHide('microphone', settings?.get_boolean('hide-microphone')); }
 function updateVolume() { refreshIndicators(); applyHide('volume', settings?.get_boolean('hide-volume')); }
+function updateBluetooth() { refreshIndicators(); applyHide('bluetooth', settings?.get_boolean('hide-bluetooth')); }
 function updateNetwork() { refreshIndicators(); applyHide('network', settings?.get_boolean('hide-network')); }
 function updatePower() { refreshIndicators(); applyHide('power', settings?.get_boolean('hide-power')); }
-function updateBluetooth() { refreshIndicators(); applyHide('bluetooth', settings?.get_boolean('hide-bluetooth')); }
 
 function applyHide(kind, hide) {
   const { indicator, signalId } = getIndicatorAndSignal(kind);
