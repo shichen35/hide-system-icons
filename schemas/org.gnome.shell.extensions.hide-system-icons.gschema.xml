@@ -21,5 +21,10 @@
       <summary>Hide Bluetooth icon</summary>
       <description>If toggled, hides the Bluetooth icon in the Quick Settings panel.</description>
     </key>
+    <key name="hide-microphone" type="b">
+      <default>false</default>
+      <summary>Hide microphone icon</summary>
+      <description>If toggled, hides the microphone icon in the Quick Settings panel.</description>
+    </key>
   </schema>
 </schemalist>

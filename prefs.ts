@@ -42,12 +42,19 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
     });
     iconsGroup.add(hidePower);
 
+    const hideMicrophone = new Adw.SwitchRow({
+      title: _('Hide microphone'),
+      subtitle: _('Hide the microphone indicator.'),
+    });
+    iconsGroup.add(hideMicrophone);
+
     window.add(page);
 
     settings.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
     settings.bind('hide-bluetooth', hideBluetooth, 'active', Gio.SettingsBindFlags.DEFAULT);
     settings.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
     settings.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
+    settings.bind('hide-microphone', hideMicrophone, 'active', Gio.SettingsBindFlags.DEFAULT);
 
     return Promise.resolve();
   }
