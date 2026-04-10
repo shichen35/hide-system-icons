@@ -73,17 +73,20 @@ export default class HideSystemIcons extends Extension {
       );
     }
 
+    this.scheduleApply();
+  }
+
+  private scheduleApply(): void {
+    if (this.sourceId !== null) return;
+    let retries = 0;
     this.sourceId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
       this.setupAllPanels();
+      for (const ps of this.panelStates) this.refreshIndicators(ps);
 
-      if (this.panelStates.length === 0)
-        return GLib.SOURCE_CONTINUE;
+      const allReady = this.panelStates.length > 0 &&
+        this.panelStates.every(ps => KINDS.every(kind => ps.indicators[kind] !== null));
 
-      for (const ps of this.panelStates) {
-        for (const kind of KINDS) {
-          if (!ps.indicators[kind]) return GLib.SOURCE_CONTINUE;
-        }
-      }
+      if (!allReady && ++retries < 50) return GLib.SOURCE_CONTINUE;
 
       this.updateAll();
       for (const ps of this.panelStates) this.attachRebuildWatch(ps);
@@ -127,8 +130,8 @@ export default class HideSystemIcons extends Extension {
           if (qs && qs !== mainQs) result.push(qs);
         }
       }
-    } catch (_) {
-      // Dash to Panel not installed
+    } catch (e) {
+      console.warn(`hide-system-icons: error reading DtP panels: ${e}`);
     }
 
     return result;
@@ -169,8 +172,8 @@ export default class HideSystemIcons extends Extension {
       if (dtp && this.dtpPanelsSignal === null) {
         this.dtpPanelsSignal = dtp.connect('panels-created', () => this.onDtpPanelsChanged());
       }
-    } catch (_) {
-      // Dash to Panel not installed
+    } catch (e) {
+      console.warn(`hide-system-icons: error connecting to DtP panels-created signal: ${e}`);
     }
   }
 
@@ -179,8 +182,8 @@ export default class HideSystemIcons extends Extension {
       if (this.dtpPanelsSignal !== null && (global as any).dashToPanel) {
         (global as any).dashToPanel.disconnect(this.dtpPanelsSignal);
       }
-    } catch (_) {
-      // ignore
+    } catch (e) {
+      console.warn(`hide-system-icons: error disconnecting DtP signal: ${e}`);
     }
     this.dtpPanelsSignal = null;
   }
@@ -191,12 +194,7 @@ export default class HideSystemIcons extends Extension {
     for (const ps of stale) this.cleanupPanelState(ps);
     this.panelStates = this.panelStates.filter(ps => currentQs.has(ps.qs));
 
-    this.setupAllPanels();
-    for (const ps of this.panelStates) {
-      this.refreshIndicators(ps);
-      this.attachRebuildWatch(ps);
-    }
-    this.updateAll();
+    this.scheduleApply();
   }
 
   private refreshIndicators(ps: PanelState): void {
