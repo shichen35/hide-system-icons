@@ -2,6 +2,7 @@
  * Legacy GNOME Shell extension entry point for GNOME 40–44.
  * Uses the legacy init/enable/disable API and supports both Aggregate Menu (40–42)
  * and Quick Settings (43–44) via runtime detection.
+ * Supports Dash to Panel multi-monitor setups via per-panel state tracking.
  */
 
 /* globals imports */
@@ -33,7 +34,6 @@ function doShow(target) {
 }
 
 function connectVisibleNotify(target, callback) {
-  // On QS indicators, connect on the object; on aggregate items, connect on actor
   if (target && typeof target.connect === 'function') {
     return target.connect('notify::visible', callback);
   }
@@ -54,28 +54,36 @@ function disconnectSignal(target, id) {
   }
 }
 
+const KINDS = ['microphone', 'volume', 'bluetooth', 'network', 'power'];
+const SETTING_KEYS = {
+  microphone: 'hide-microphone',
+  volume:     'hide-volume',
+  bluetooth:  'hide-bluetooth',
+  network:    'hide-network',
+  power:      'hide-power',
+};
+
 let settings = null;
 let idleSource = 0;
 let settingsSignalIds = [];
+let panelStates = [];
+let dtpSignal = 0;
 
-// Indicators (either QS items or AggregateMenu children)
-let microphoneIndicator = null;
-let volumeIndicator = null;
-let bluetoothIndicator = null;
-let networkIndicator = null;
-let powerIndicator = null;
-
-// Signal IDs for re-hiding when external code toggles visibility
-let sigMicrophone = 0;
-let sigVolume = 0;
-let sigBluetooth = 0;
-let sigNetwork = 0;
-let sigPower = 0;
-
-// Rebuild watchers (QS containers only)
-let container = null;
-let addedHandler = 0;
-let removedHandler = 0;
+/**
+ * Per-panel state object. `menu` is either an aggregateMenu or quickSettings
+ * instance; `isQs` distinguishes which indicator layout to use.
+ */
+function makePanelState(menu, isQs) {
+  return {
+    menu,
+    isQs,
+    indicators: { microphone: null, volume: null, bluetooth: null, network: null, power: null },
+    signals:    { microphone: 0,    volume: 0,    bluetooth: 0,    network: 0,    power: 0    },
+    container: null,
+    addedHandler: 0,
+    removedHandler: 0,
+  };
+}
 
 function init() {}
 
@@ -83,32 +91,11 @@ function enable() {
   settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.hide-system-icons');
   settingsSignalIds = [];
 
-  // React to settings changes
-  settingsSignalIds.push(settings.connect('changed::hide-microphone', updateMicrophone));
-  settingsSignalIds.push(settings.connect('changed::hide-volume', updateVolume));
-  settingsSignalIds.push(settings.connect('changed::hide-bluetooth', updateBluetooth));
-  settingsSignalIds.push(settings.connect('changed::hide-network', updateNetwork));
-  settingsSignalIds.push(settings.connect('changed::hide-power', updatePower));
+  for (const kind of KINDS) {
+    settingsSignalIds.push(settings.connect(`changed::${SETTING_KEYS[kind]}`, updateAll));
+  }
 
-  // Defer initial binding until the panel finishes building
-  idleSource = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-    refreshIndicators();
-    // Only require core indicators that are guaranteed to exist.
-    // Microphone may not exist on GNOME 40–42 (Aggregate Menu), and
-    // Bluetooth may be absent on systems without Bluetooth hardware.
-    if (!volumeIndicator || !networkIndicator || !powerIndicator) {
-      return GLib.SOURCE_CONTINUE;
-    }
-
-    // Apply initial state
-    reapplyAll();
-
-    // Watch for QS rebuilds on 43–44
-    attachRebuildWatch();
-
-    idleSource = 0;
-    return GLib.SOURCE_REMOVE;
-  });
+  scheduleApply();
 }
 
 function disable() {
@@ -117,225 +104,280 @@ function disable() {
     idleSource = 0;
   }
 
-  // Detach rebuild watchers if any
-  detachRebuildWatch();
-
-  // Show indicators back and disconnect signals
-  cleanupIndicator('microphone');
-  cleanupIndicator('volume');
-  cleanupIndicator('bluetooth');
-  cleanupIndicator('network');
-  cleanupIndicator('power');
-
   if (settings) {
-    for (const id of settingsSignalIds) {
-      settings.disconnect(id);
-    }
+    for (const id of settingsSignalIds) settings.disconnect(id);
+    settingsSignalIds = [];
+    settings = null;
   }
-  settingsSignalIds = [];
-  settings = null;
+
+  unwatchDtpPanels();
+
+  for (const ps of panelStates) cleanupPanelState(ps);
+  panelStates = [];
 }
 
 function isQuickSettingsAvailable() {
-  return Main.panel && Main.panel.statusArea && Main.panel.statusArea.quickSettings;
+  return !!(Main.panel && Main.panel.statusArea && Main.panel.statusArea.quickSettings);
 }
 
-function refreshIndicators() {
-  if (isQuickSettingsAvailable()) {
-    const qs = Main.panel.statusArea.quickSettings;
-    // Private fields vary by release; guard all lookups and provide fallbacks
-    let microphoneCandidate = qs._volumeInput ?? null;
-    let volumeCandidate = qs._volumeOutput ?? qs._volume ?? qs._volumeItem ?? null;
-    let bluetoothCandidate = qs._bluetooth ?? qs._bluetoothItem ?? null;
-    let networkCandidate = qs._network ?? qs._networkItem ?? null;
-    let powerCandidate = qs._system ?? qs._power ?? qs._powerItem ?? null;
+/**
+ * Returns all menus (aggregateMenu on GNOME 40-42, quickSettings on 43-44)
+ * across Main.panel and any Dash to Panel secondary panels.
+ */
+function getAllMenus() {
+  const result = [];
+  const isQs = isQuickSettingsAvailable();
+  const menuName = isQs ? 'quickSettings' : 'aggregateMenu';
 
-    // Fallback: scan properties by name if still missing
-    const findByName = (obj, names) => {
-      const keys = Object.keys(obj || {});
-      const lowerNames = names.map(n => String(n).toLowerCase());
-      for (const k of keys) {
-        const kl = k.toLowerCase();
-        if (lowerNames.some(n => kl.includes(n))) {
-          const val = obj[k];
-          if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
-            return val;
-        }
+  const mainMenu = Main.panel.statusArea && Main.panel.statusArea[menuName];
+  if (mainMenu) result.push({ menu: mainMenu, isQs });
+
+  // Dash to Panel exposes per-monitor panels via global.dashToPanel.panels.
+  // On GNOME 40-42 each standalone panel has its own statusArea.aggregateMenu;
+  // on GNOME 43-44 it has statusArea.quickSettings.
+  try {
+    const dtpPanels = global.dashToPanel && global.dashToPanel.panels;
+    if (dtpPanels) {
+      for (const p of dtpPanels) {
+        const menu = p.statusArea && p.statusArea[menuName];
+        if (menu && menu !== mainMenu) result.push({ menu, isQs });
       }
-      return null;
-    };
+    }
+  } catch (e) {
+    log(`hide-system-icons: error reading DtP panels: ${e}`);
+  }
 
-    if (!microphoneCandidate)
-      microphoneCandidate = findByName(qs, ['volumeinput', 'microphone', 'mic', 'input']);
-    if (!volumeCandidate)
-      volumeCandidate = findByName(qs, ['volume', 'audio', 'sound']);
-    if (!bluetoothCandidate)
-      bluetoothCandidate = findByName(qs, ['bluetooth', 'bt']);
-    if (!networkCandidate)
-      networkCandidate = findByName(qs, ['network', 'net', 'wifi', 'wireless']);
-    if (!powerCandidate)
-      powerCandidate = findByName(qs, ['power', 'system', 'battery']);
+  return result;
+}
 
-    replaceIndicator('microphone', microphoneCandidate);
-    replaceIndicator('volume', volumeCandidate);
-    replaceIndicator('bluetooth', bluetoothCandidate);
-    replaceIndicator('network', networkCandidate);
-    replaceIndicator('power', powerCandidate);
+function setupAllPanels() {
+  const allMenus = getAllMenus();
+  const existingMenus = new Set(panelStates.map(ps => ps.menu));
 
-    // Track container for rebuilds (43–44 have _indicators; sometimes _grid)
-    const newContainer = qs._indicators ?? qs._grid ?? qs._box ?? null;
-    if (container !== newContainer) {
-      detachRebuildWatch();
-      container = newContainer;
-      attachRebuildWatch();
+  for (const { menu, isQs } of allMenus) {
+    if (existingMenus.has(menu)) continue;
+    panelStates.push(makePanelState(menu, isQs));
+  }
+}
+
+function cleanupPanelState(ps) {
+  detachRebuildWatch(ps);
+  for (const kind of KINDS) {
+    const indicator = ps.indicators[kind];
+    const signalId = ps.signals[kind];
+    if (indicator && signalId) disconnectSignal(indicator, signalId);
+    ps.signals[kind] = 0;
+    doShow(indicator);
+    ps.indicators[kind] = null;
+  }
+}
+
+function watchDtpPanels() {
+  try {
+    const dtp = global.dashToPanel;
+    if (dtp && !dtpSignal) {
+      dtpSignal = dtp.connect('panels-created', onDtpPanelsChanged);
+    }
+  } catch (e) {
+    log(`hide-system-icons: error connecting to DtP panels-created signal: ${e}`);
+  }
+}
+
+function unwatchDtpPanels() {
+  try {
+    if (dtpSignal && global.dashToPanel) {
+      global.dashToPanel.disconnect(dtpSignal);
+    }
+  } catch (e) {
+    log(`hide-system-icons: error disconnecting DtP signal: ${e}`);
+  }
+  dtpSignal = 0;
+}
+
+function onDtpPanelsChanged() {
+  const currentMenus = new Set(getAllMenus().map(({ menu }) => menu));
+  const stale = panelStates.filter(ps => !currentMenus.has(ps.menu));
+  for (const ps of stale) cleanupPanelState(ps);
+  panelStates = panelStates.filter(ps => currentMenus.has(ps.menu));
+
+  scheduleApply();
+}
+
+/**
+ * Defers setup until the panel is ready, then applies all settings.
+ * Caps retries at 50 to avoid an infinite loop on systems where some
+ * indicators (e.g. bluetooth) are permanently absent.
+ * Safe to call from onDtpPanelsChanged: the guard prevents a duplicate
+ * source since panels-created cannot fire before watchDtpPanels() is
+ * called, which only happens after the initial idle loop completes.
+ */
+function scheduleApply() {
+  if (idleSource) return;
+  let retries = 0;
+  idleSource = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+    setupAllPanels();
+    for (const ps of panelStates) refreshIndicatorsForPanel(ps);
+
+    // Only require indicators that are guaranteed present on all supported
+    // versions. Microphone may be absent on GNOME 40-42 aggregate menu;
+    // bluetooth may be absent on systems without hardware.
+    const allReady = panelStates.length > 0 &&
+      panelStates.every(ps => ps.indicators.volume && ps.indicators.network && ps.indicators.power);
+
+    if (!allReady && ++retries < 50) return GLib.SOURCE_CONTINUE;
+
+    updateAll();
+    for (const ps of panelStates) attachRebuildWatch(ps);
+    watchDtpPanels();
+
+    idleSource = 0;
+    return GLib.SOURCE_REMOVE;
+  });
+}
+
+function refreshIndicatorsForPanel(ps) {
+  if (ps.isQs) {
+    refreshQsIndicators(ps);
+    // QS containers emit child-added/child-removed on panel rebuilds
+    const newContainer = ps.menu._indicators || ps.menu._grid || ps.menu._box || null;
+    if (newContainer !== ps.container) {
+      detachRebuildWatch(ps);
+      ps.container = newContainer;
+      attachRebuildWatch(ps);
     }
   } else {
-    // GNOME 42: Aggregate Menu
-    const agg = Main.panel.statusArea && Main.panel.statusArea.aggregateMenu;
-    detachRebuildWatch();
-    if (!agg) return;
+    refreshAggIndicators(ps);
+    // Aggregate menu does not have a rebuild-watchable container
+  }
+}
 
-    // Try known children; guard all lookups.
-    let volumeCandidate = agg._volume ?? agg._volumeItem ?? null;
-    let bluetoothCandidate = agg._bluetooth ?? agg._bluetoothItem ?? null;
-    let networkCandidate = agg._network ?? agg._networkItem ?? null;
-    let powerCandidate = agg._power ?? agg._powerItem ?? null;
+function refreshQsIndicators(ps) {
+  const qs = ps.menu;
 
-    // GNOME 40–41 fallbacks: scan aggregateMenu properties for best match
-    const findByName = (names) => {
-      const keys = Object.keys(agg || {});
-      const lowerNames = names.map(n => String(n).toLowerCase());
-      for (const k of keys) {
-        const kl = k.toLowerCase();
-        if (lowerNames.some(n => kl.includes(n))) {
-          const val = agg[k];
-          if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function'))) {
-            return val;
-          }
-        }
+  let micCandidate = qs._volumeInput || null;
+  let volCandidate = qs._volumeOutput || qs._volume || qs._volumeItem || null;
+  let btCandidate  = qs._bluetooth   || qs._bluetoothItem || null;
+  let netCandidate = qs._network     || qs._networkItem   || null;
+  let powCandidate = qs._system      || qs._power         || qs._powerItem || null;
+
+  const findByName = (obj, names) => {
+    const keys = Object.keys(obj || {});
+    const lowerNames = names.map(n => String(n).toLowerCase());
+    for (const k of keys) {
+      const kl = k.toLowerCase();
+      if (lowerNames.some(n => kl.includes(n))) {
+        const val = obj[k];
+        if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
+          return val;
       }
-      return null;
-    };
-
-    // Note: microphone indicator may not exist in GNOME 40–42 Aggregate Menu
-    let microphoneCandidate = findByName(['volumeinput', 'microphone', 'mic', 'input']);
-    if (!volumeCandidate)
-      volumeCandidate = findByName(['volume', 'audio', 'sound']);
-    if (!bluetoothCandidate)
-      bluetoothCandidate = findByName(['bluetooth', 'bt']);
-    if (!networkCandidate)
-      networkCandidate = findByName(['network', 'net', 'wifi', 'wireless']);
-    if (!powerCandidate)
-      powerCandidate = findByName(['power', 'battery']);
-
-    replaceIndicator('microphone', microphoneCandidate);
-    replaceIndicator('volume', volumeCandidate);
-    replaceIndicator('bluetooth', bluetoothCandidate);
-    replaceIndicator('network', networkCandidate);
-    replaceIndicator('power', powerCandidate);
-  }
-}
-
-function attachRebuildWatch() {
-  if (!container) return;
-  if (!addedHandler) addedHandler = container.connect('child-added', reapplyAll);
-  if (!removedHandler) removedHandler = container.connect('child-removed', reapplyAll);
-}
-
-function detachRebuildWatch() {
-  if (container) {
-    if (addedHandler) {
-      container.disconnect(addedHandler);
-      addedHandler = 0;
     }
-    if (removedHandler) {
-      container.disconnect(removedHandler);
-      removedHandler = 0;
+    return null;
+  };
+
+  if (!micCandidate) micCandidate = findByName(qs, ['volumeinput', 'microphone', 'mic', 'input']);
+  if (!volCandidate) volCandidate = findByName(qs, ['volume', 'audio', 'sound']);
+  if (!btCandidate)  btCandidate  = findByName(qs, ['bluetooth', 'bt']);
+  if (!netCandidate) netCandidate = findByName(qs, ['network', 'net', 'wifi', 'wireless']);
+  if (!powCandidate) powCandidate = findByName(qs, ['power', 'system', 'battery']);
+
+  replaceIndicator(ps, 'microphone', micCandidate);
+  replaceIndicator(ps, 'volume',     volCandidate);
+  replaceIndicator(ps, 'bluetooth',  btCandidate);
+  replaceIndicator(ps, 'network',    netCandidate);
+  replaceIndicator(ps, 'power',      powCandidate);
+}
+
+function refreshAggIndicators(ps) {
+  const agg = ps.menu;
+
+  let volCandidate = agg._volume    || agg._volumeItem    || null;
+  let btCandidate  = agg._bluetooth || agg._bluetoothItem || null;
+  let netCandidate = agg._network   || agg._networkItem   || null;
+  let powCandidate = agg._power     || agg._powerItem     || null;
+
+  const findByName = (names) => {
+    const keys = Object.keys(agg || {});
+    const lowerNames = names.map(n => String(n).toLowerCase());
+    for (const k of keys) {
+      const kl = k.toLowerCase();
+      if (lowerNames.some(n => kl.includes(n))) {
+        const val = agg[k];
+        if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
+          return val;
+      }
     }
-  }
-  container = null;
+    return null;
+  };
+
+  // Note: microphone indicator is absent in GNOME 40–42 Aggregate Menu
+  const micCandidate = findByName(['volumeinput', 'microphone', 'mic', 'input']);
+  if (!volCandidate) volCandidate = findByName(['volume', 'audio', 'sound']);
+  if (!btCandidate)  btCandidate  = findByName(['bluetooth', 'bt']);
+  if (!netCandidate) netCandidate = findByName(['network', 'net', 'wifi', 'wireless']);
+  if (!powCandidate) powCandidate = findByName(['power', 'battery']);
+
+  replaceIndicator(ps, 'microphone', micCandidate);
+  replaceIndicator(ps, 'volume',     volCandidate);
+  replaceIndicator(ps, 'bluetooth',  btCandidate);
+  replaceIndicator(ps, 'network',    netCandidate);
+  replaceIndicator(ps, 'power',      powCandidate);
 }
 
-function cleanupIndicator(kind) {
-  const { indicator, signalId } = getIndicatorAndSignal(kind);
-  if (indicator && signalId) disconnectSignal(indicator, signalId);
-  setSignal(kind, 0);
-  doShow(indicator);
-  setIndicator(kind, null);
-}
-
-function getIndicatorAndSignal(kind) {
-  switch (kind) {
-    case 'microphone':
-      return { indicator: microphoneIndicator, signalId: sigMicrophone };
-    case 'volume':
-      return { indicator: volumeIndicator, signalId: sigVolume };
-    case 'bluetooth':
-      return { indicator: bluetoothIndicator, signalId: sigBluetooth };
-    case 'network':
-      return { indicator: networkIndicator, signalId: sigNetwork };
-    case 'power':
-      return { indicator: powerIndicator, signalId: sigPower };
-  }
-  return { indicator: null, signalId: 0 };
-}
-
-function setIndicator(kind, value) {
-  switch (kind) {
-    case 'microphone': microphoneIndicator = value; break;
-    case 'volume': volumeIndicator = value; break;
-    case 'bluetooth': bluetoothIndicator = value; break;
-    case 'network': networkIndicator = value; break;
-    case 'power': powerIndicator = value; break;
-  }
-}
-
-function setSignal(kind, id) {
-  switch (kind) {
-    case 'microphone': sigMicrophone = id; break;
-    case 'volume': sigVolume = id; break;
-    case 'bluetooth': sigBluetooth = id; break;
-    case 'network': sigNetwork = id; break;
-    case 'power': sigPower = id; break;
-  }
-}
-
-function replaceIndicator(kind, newIndicator) {
-  const { indicator: oldIndicator, signalId } = getIndicatorAndSignal(kind);
+function replaceIndicator(ps, kind, newIndicator) {
+  const oldIndicator = ps.indicators[kind];
+  const signalId = ps.signals[kind];
   if (oldIndicator === newIndicator) return;
-
   if (oldIndicator && signalId) {
     disconnectSignal(oldIndicator, signalId);
-    setSignal(kind, 0);
+    ps.signals[kind] = 0;
   }
-
-  setIndicator(kind, newIndicator);
+  ps.indicators[kind] = newIndicator;
 }
 
-function reapplyAll() {
-  refreshIndicators();
-  applyHide('microphone', settings?.get_boolean('hide-microphone'));
-  applyHide('volume', settings?.get_boolean('hide-volume'));
-  applyHide('bluetooth', settings?.get_boolean('hide-bluetooth'));
-  applyHide('network', settings?.get_boolean('hide-network'));
-  applyHide('power', settings?.get_boolean('hide-power'));
+function attachRebuildWatch(ps) {
+  if (!ps.container) return;
+  if (!ps.addedHandler)
+    ps.addedHandler = ps.container.connect('child-added', () => reapplyAll(ps));
+  if (!ps.removedHandler)
+    ps.removedHandler = ps.container.connect('child-removed', () => reapplyAll(ps));
 }
 
-function updateMicrophone() { refreshIndicators(); applyHide('microphone', settings?.get_boolean('hide-microphone')); }
-function updateVolume() { refreshIndicators(); applyHide('volume', settings?.get_boolean('hide-volume')); }
-function updateBluetooth() { refreshIndicators(); applyHide('bluetooth', settings?.get_boolean('hide-bluetooth')); }
-function updateNetwork() { refreshIndicators(); applyHide('network', settings?.get_boolean('hide-network')); }
-function updatePower() { refreshIndicators(); applyHide('power', settings?.get_boolean('hide-power')); }
+function detachRebuildWatch(ps) {
+  if (!ps.container) return;
+  if (ps.addedHandler)   { ps.container.disconnect(ps.addedHandler);   ps.addedHandler = 0; }
+  if (ps.removedHandler) { ps.container.disconnect(ps.removedHandler); ps.removedHandler = 0; }
+  ps.container = null;
+}
 
-function applyHide(kind, hide) {
-  const { indicator, signalId } = getIndicatorAndSignal(kind);
+function reapplyAll(ps) {
+  refreshIndicatorsForPanel(ps);
+  for (const kind of KINDS) {
+    applyHide(ps, kind, settings && settings.get_boolean(SETTING_KEYS[kind]));
+  }
+}
+
+function updateAll() {
+  for (const ps of panelStates) {
+    refreshIndicatorsForPanel(ps);
+    for (const kind of KINDS) {
+      applyHide(ps, kind, settings && settings.get_boolean(SETTING_KEYS[kind]));
+    }
+  }
+}
+
+function applyHide(ps, kind, hide) {
+  const indicator = ps.indicators[kind];
   if (!indicator) return;
+  const signalId = ps.signals[kind];
   if (hide) {
     doHide(indicator);
-    if (!signalId) setSignal(kind, connectVisibleNotify(indicator, () => doHide(indicator)));
+    if (!signalId)
+      ps.signals[kind] = connectVisibleNotify(indicator, () => doHide(indicator));
   } else {
-    if (signalId) disconnectSignal(indicator, signalId);
-    setSignal(kind, 0);
+    if (signalId) {
+      disconnectSignal(indicator, signalId);
+      ps.signals[kind] = 0;
+    }
     doShow(indicator);
   }
 }
