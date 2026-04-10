@@ -3,7 +3,7 @@ DOMAIN = shichen35.github.io
 UUID = $(NAME)@$(DOMAIN)
 EXT_DIR = ~/.local/share/gnome-shell/extensions/$(UUID)
 
-MODERN_ZIP = $(NAME)-gnome-45-49.zip
+MODERN_ZIP = $(NAME)-gnome-45-50.zip
 LEGACY_ZIP = $(NAME)-gnome-40-44.zip
 SCHEMAS = schemas/gschemas.compiled
 EXTRAS = icon.png README.md LICENSE
@@ -47,4 +47,4 @@ install-modern install-legacy:
 	@cp -r $(SRC)/* $(EXT_DIR)/
 
 clean:
-	@rm -rf dist legacy-dist node_modules $(MODERN_ZIP) $(LEGACY_ZIP)
+	@rm -rf dist legacy-dist node_modules $(MODERN_ZIP) $(LEGACY_ZIP) $(NAME)-gnome-45-49.zip
