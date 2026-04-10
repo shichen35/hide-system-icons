@@ -10,74 +10,84 @@ interface Hideable {
   disconnect(handlerId: number): void;
 }
 
+interface QuickSettingsPanel {
+  _volumeInput?: Hideable | null;
+  _volumeOutput?: Hideable | null;
+  _bluetooth?: Hideable | null;
+  _network?: Hideable | null;
+  _system?: Hideable | null;
+  _indicators?: any | null;
+  _grid?: any | null;
+}
+
+type IndicatorKind = 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power';
+
+const SETTING_KEYS: Record<IndicatorKind, string> = {
+  microphone: 'hide-microphone',
+  volume: 'hide-volume',
+  bluetooth: 'hide-bluetooth',
+  network: 'hide-network',
+  power: 'hide-power',
+};
+
+const QS_FIELDS: Record<IndicatorKind, keyof QuickSettingsPanel> = {
+  microphone: '_volumeInput',
+  volume: '_volumeOutput',
+  bluetooth: '_bluetooth',
+  network: '_network',
+  power: '_system',
+};
+
+const KINDS: IndicatorKind[] = ['microphone', 'volume', 'bluetooth', 'network', 'power'];
+
+class PanelState {
+  qs: QuickSettingsPanel;
+  indicators: Record<IndicatorKind, Hideable | null> = {
+    microphone: null, volume: null, bluetooth: null, network: null, power: null,
+  };
+  signalIds: Record<IndicatorKind, number | null> = {
+    microphone: null, volume: null, bluetooth: null, network: null, power: null,
+  };
+  container: any | null = null;
+  containerAddedHandler: number | null = null;
+  containerRemovedHandler: number | null = null;
+
+  constructor(qs: QuickSettingsPanel) {
+    this.qs = qs;
+  }
+}
+
 export default class HideSystemIcons extends Extension {
   private sourceId: number | null = null;
   private settings: Gio.Settings | null = null;
-
-  private microphone: Hideable | null = null;
-  private volumeOutput: Hideable | null = null;
-  private bluetooth: Hideable | null = null;
-  private network: Hideable | null = null;
-  private power: Hideable | null = null;
-
-  private showSignalMicrophone: number | null = null;
-  private showSignalVolume: number | null = null;
-  private showSignalBluetooth: number | null = null;
-  private showSignalNetwork: number | null = null;
-  private showSignalPower: number | null = null;
-
   private settingsSignalIds: number[] = [];
-  private indicatorsContainer: any | null = null;
-  private indicatorsAddedHandler: number | null = null;
-  private indicatorsRemovedHandler: number | null = null;
+  private panelStates: PanelState[] = [];
+  private dtpPanelsSignal: number | null = null;
 
   enable(): void {
     this.settings = this.getSettings();
 
-    // React to settings changes
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-microphone", () => this.updateMicrophone()),
-    );
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-volume", () => this.updateVolume()),
-    );
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-bluetooth", () => this.updateBluetooth()),
-    );
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-network", () => this.updateNetwork()),
-    );
-    this.settingsSignalIds.push(
-      this.settings.connect("changed::hide-power", () => this.updatePower()),
-    );
+    for (const kind of KINDS) {
+      this.settingsSignalIds.push(
+        this.settings.connect(`changed::${SETTING_KEYS[kind]}`, () => this.updateAll()),
+      );
+    }
 
     this.sourceId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-      const qs = Main.panel.statusArea.quickSettings as unknown as {
-        _volumeInput?: Hideable | null;
-        _volumeOutput?: Hideable | null;
-        _bluetooth?: Hideable | null;
-        _network?: Hideable | null;
-        _system?: Hideable | null;
-      };
+      this.setupAllPanels();
 
-      this.microphone = (qs._volumeInput ?? null) as Hideable | null;
-      this.volumeOutput = (qs._volumeOutput ?? null) as Hideable | null;
-      this.bluetooth = (qs._bluetooth ?? null) as Hideable | null;
-      this.network = (qs._network ?? null) as Hideable | null;
-      this.power = (qs._system ?? null) as Hideable | null;
-
-      if (!this.microphone || !this.volumeOutput || !this.bluetooth || !this.network || !this.power)
+      if (this.panelStates.length === 0)
         return GLib.SOURCE_CONTINUE;
 
-      // Apply initial states according to settings
-      this.updateMicrophone();
-      this.updateVolume();
-      this.updateBluetooth();
-      this.updateNetwork();
-      this.updatePower();
+      for (const ps of this.panelStates) {
+        for (const kind of KINDS) {
+          if (!ps.indicators[kind]) return GLib.SOURCE_CONTINUE;
+        }
+      }
 
-      // Watch for Quick Settings rebuilds and re-apply settings when needed
-      this.attachRebuildWatch();
+      this.updateAll();
+      for (const ps of this.panelStates) this.attachRebuildWatch(ps);
+      this.watchDtpPanels();
 
       this.sourceId = null;
       return GLib.SOURCE_REMOVE;
@@ -85,210 +95,189 @@ export default class HideSystemIcons extends Extension {
   }
 
   disable(): void {
-    // The "unlock-dialog" session mode is used to hide the volume indicator on the lockscreen.
     if (this.sourceId !== null) {
       GLib.Source.remove(this.sourceId);
       this.sourceId = null;
     }
-    // Disconnect settings handlers
+
     if (this.settings) {
       for (const id of this.settingsSignalIds) this.settings.disconnect(id);
       this.settingsSignalIds = [];
       this.settings = null;
     }
 
-    // Detach rebuild watchers if any
-    this.detachRebuildWatch();
+    this.unwatchDtpPanels();
 
-    // Restore and cleanup indicators
-    this.cleanupIndicator(this.microphone, 'microphone');
-    this.cleanupIndicator(this.volumeOutput, 'volume');
-    this.cleanupIndicator(this.bluetooth, 'bluetooth');
-    this.cleanupIndicator(this.network, 'network');
-    this.cleanupIndicator(this.power, 'power');
+    for (const ps of this.panelStates) this.cleanupPanelState(ps);
+    this.panelStates = [];
   }
 
-  private cleanupIndicator(indicator: Hideable | null, kind: 'volume' | 'network' | 'power' | 'bluetooth' | 'microphone'): void {
-    if (!indicator) return;
-    const signalId = this.getSignalId(kind);
-    if (signalId !== null) {
-      indicator.disconnect(signalId);
-      this.setSignalId(kind, null);
+  private getAllQuickSettings(): QuickSettingsPanel[] {
+    const result: QuickSettingsPanel[] = [];
+
+    const mainQs = Main.panel.statusArea?.quickSettings as unknown as QuickSettingsPanel | undefined;
+    if (mainQs) result.push(mainQs);
+
+    // Dash to Panel creates separate quickSettings on secondary monitors
+    try {
+      const dtpPanels = (global as any).dashToPanel?.panels;
+      if (dtpPanels) {
+        for (const p of dtpPanels) {
+          const qs = p.statusArea?.quickSettings as unknown as QuickSettingsPanel | undefined;
+          if (qs && qs !== mainQs) result.push(qs);
+        }
+      }
+    } catch (_) {
+      // Dash to Panel not installed
     }
-    indicator.show();
-    if (kind === 'microphone') this.microphone = null;
-    if (kind === 'volume') this.volumeOutput = null;
-    if (kind === 'bluetooth') this.bluetooth = null;
-    if (kind === 'network') this.network = null;
-    if (kind === 'power') this.power = null;
+
+    return result;
   }
 
-  private getSignalId(kind: 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' ): number | null {
-    if (kind === 'microphone') return this.showSignalMicrophone;
-    if (kind === 'volume') return this.showSignalVolume;
-    if (kind === 'bluetooth') return this.showSignalBluetooth;
-    if (kind === 'network') return this.showSignalNetwork;
-    if (kind === 'power') return this.showSignalPower;
-    return null;
-  }
+  private setupAllPanels(): void {
+    const allQs = this.getAllQuickSettings();
+    const existingQs = new Set(this.panelStates.map(ps => ps.qs));
 
-  private setSignalId(kind: 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' , id: number | null): void {
-    if (kind === 'microphone') this.showSignalMicrophone = id;
-    else if (kind === 'volume') this.showSignalVolume = id;
-    else if (kind === 'bluetooth') this.showSignalBluetooth = id;
-    else if (kind === 'network') this.showSignalNetwork = id;
-    else if (kind === 'power') this.showSignalPower = id;
-  }
-
-  private refreshIndicators(): void {
-    const qs = Main.panel.statusArea.quickSettings as unknown as {
-      _volumeInput?: Hideable | null;
-      _volumeOutput?: Hideable | null;
-      _bluetooth?: Hideable | null;
-      _network?: Hideable | null;
-      _system?: Hideable | null;
-      _indicators?: any | null;
-      _grid?: any | null;
-    };
-
-    const newMicrophone = (qs._volumeInput ?? null) as Hideable | null;
-    const newVolume = (qs._volumeOutput ?? null) as Hideable | null;
-    const newBluetooth = (qs._bluetooth ?? null) as Hideable | null;
-    const newNetwork = (qs._network ?? null) as Hideable | null;
-    const newPower = (qs._system ?? null) as Hideable | null;
-
-    if (newMicrophone !== this.microphone) {
-      if (this.microphone && this.showSignalMicrophone !== null) {
-        this.microphone.disconnect(this.showSignalMicrophone);
-        this.showSignalMicrophone = null;
+    for (const qs of allQs) {
+      if (existingQs.has(qs)) continue;
+      const ps = new PanelState(qs);
+      for (const kind of KINDS) {
+        ps.indicators[kind] = (qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
       }
-      this.microphone = newMicrophone;
-    }
-
-    if (newVolume !== this.volumeOutput) {
-      if (this.volumeOutput && this.showSignalVolume !== null) {
-        this.volumeOutput.disconnect(this.showSignalVolume);
-        this.showSignalVolume = null;
-      }
-      this.volumeOutput = newVolume;
-    }
-
-    if (newBluetooth !== this.bluetooth) {
-      if (this.bluetooth && this.showSignalBluetooth !== null) {
-        this.bluetooth.disconnect(this.showSignalBluetooth);
-        this.showSignalBluetooth = null;
-      }
-      this.bluetooth = newBluetooth;
-    }
-
-    if (newNetwork !== this.network) {
-      if (this.network && this.showSignalNetwork !== null) {
-        this.network.disconnect(this.showSignalNetwork);
-        this.showSignalNetwork = null;
-      }
-      this.network = newNetwork;
-    }
-
-    if (newPower !== this.power) {
-      if (this.power && this.showSignalPower !== null) {
-        this.power.disconnect(this.showSignalPower);
-        this.showSignalPower = null;
-      }
-      this.power = newPower;
-    }
-
-    // Track the container used by Quick Settings to detect rebuilds
-    const container = (qs as any)._indicators ?? (qs as any)._grid ?? null;
-    if (container !== this.indicatorsContainer) {
-      this.detachRebuildWatch();
-      this.indicatorsContainer = container;
-      this.attachRebuildWatch();
+      this.panelStates.push(ps);
     }
   }
 
-  private attachRebuildWatch(): void {
-    const qs = Main.panel.statusArea.quickSettings as unknown as { _indicators?: any | null; _grid?: any | null };
-    const container = this.indicatorsContainer ?? (qs._indicators ?? qs._grid ?? null);
+  private cleanupPanelState(ps: PanelState): void {
+    this.detachRebuildWatch(ps);
+    for (const kind of KINDS) {
+      const indicator = ps.indicators[kind];
+      if (!indicator) continue;
+      const signalId = ps.signalIds[kind];
+      if (signalId !== null) {
+        indicator.disconnect(signalId);
+        ps.signalIds[kind] = null;
+      }
+      indicator.show();
+      ps.indicators[kind] = null;
+    }
+  }
+
+  private watchDtpPanels(): void {
+    try {
+      const dtp = (global as any).dashToPanel;
+      if (dtp && this.dtpPanelsSignal === null) {
+        this.dtpPanelsSignal = dtp.connect('panels-created', () => this.onDtpPanelsChanged());
+      }
+    } catch (_) {
+      // Dash to Panel not installed
+    }
+  }
+
+  private unwatchDtpPanels(): void {
+    try {
+      if (this.dtpPanelsSignal !== null && (global as any).dashToPanel) {
+        (global as any).dashToPanel.disconnect(this.dtpPanelsSignal);
+      }
+    } catch (_) {
+      // ignore
+    }
+    this.dtpPanelsSignal = null;
+  }
+
+  private onDtpPanelsChanged(): void {
+    const currentQs = new Set(this.getAllQuickSettings());
+    const stale = this.panelStates.filter(ps => !currentQs.has(ps.qs));
+    for (const ps of stale) this.cleanupPanelState(ps);
+    this.panelStates = this.panelStates.filter(ps => currentQs.has(ps.qs));
+
+    this.setupAllPanels();
+    for (const ps of this.panelStates) {
+      this.refreshIndicators(ps);
+      this.attachRebuildWatch(ps);
+    }
+    this.updateAll();
+  }
+
+  private refreshIndicators(ps: PanelState): void {
+    for (const kind of KINDS) {
+      const newIndicator = (ps.qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
+      const oldIndicator = ps.indicators[kind];
+      if (newIndicator !== oldIndicator) {
+        if (oldIndicator && ps.signalIds[kind] !== null) {
+          oldIndicator.disconnect(ps.signalIds[kind]!);
+          ps.signalIds[kind] = null;
+        }
+        ps.indicators[kind] = newIndicator;
+      }
+    }
+
+    const container = ps.qs._indicators ?? ps.qs._grid ?? null;
+    if (container !== ps.container) {
+      this.detachRebuildWatch(ps);
+      ps.container = container;
+      this.attachRebuildWatch(ps);
+    }
+  }
+
+  private attachRebuildWatch(ps: PanelState): void {
+    const container = ps.container ?? (ps.qs._indicators ?? ps.qs._grid ?? null);
     if (!container) return;
-    this.indicatorsContainer = container;
-    if (this.indicatorsAddedHandler === null) {
-      this.indicatorsAddedHandler = container.connect('child-added', () => this.reapplyAll());
+    ps.container = container;
+    if (ps.containerAddedHandler === null) {
+      ps.containerAddedHandler = container.connect('child-added', () => this.reapplyAll(ps));
     }
-    if (this.indicatorsRemovedHandler === null) {
-      this.indicatorsRemovedHandler = container.connect('child-removed', () => this.reapplyAll());
+    if (ps.containerRemovedHandler === null) {
+      ps.containerRemovedHandler = container.connect('child-removed', () => this.reapplyAll(ps));
     }
   }
 
-  private detachRebuildWatch(): void {
-    if (!this.indicatorsContainer) return;
-    if (this.indicatorsAddedHandler !== null) {
-      this.indicatorsContainer.disconnect(this.indicatorsAddedHandler);
-      this.indicatorsAddedHandler = null;
+  private detachRebuildWatch(ps: PanelState): void {
+    if (!ps.container) return;
+    if (ps.containerAddedHandler !== null) {
+      ps.container.disconnect(ps.containerAddedHandler);
+      ps.containerAddedHandler = null;
     }
-    if (this.indicatorsRemovedHandler !== null) {
-      this.indicatorsContainer.disconnect(this.indicatorsRemovedHandler);
-      this.indicatorsRemovedHandler = null;
+    if (ps.containerRemovedHandler !== null) {
+      ps.container.disconnect(ps.containerRemovedHandler);
+      ps.containerRemovedHandler = null;
     }
-    this.indicatorsContainer = null;
+    ps.container = null;
   }
 
-  private reapplyAll(): void {
-    this.refreshIndicators();
-    const hideMic = this.settings?.get_boolean('hide-microphone') ?? false;
-    const hideVol = this.settings?.get_boolean('hide-volume') ?? false;
-    const hideBt = this.settings?.get_boolean('hide-bluetooth') ?? false;
-    const hideNet = this.settings?.get_boolean('hide-network') ?? false;
-    const hidePow = this.settings?.get_boolean('hide-power') ?? false;
-    this.applyHide(this.microphone, hideMic, 'microphone');
-    this.applyHide(this.volumeOutput, hideVol, 'volume');
-    this.applyHide(this.bluetooth, hideBt, 'bluetooth');
-    this.applyHide(this.network, hideNet, 'network');
-    this.applyHide(this.power, hidePow, 'power');
+  private reapplyAll(ps: PanelState): void {
+    this.refreshIndicators(ps);
+    for (const kind of KINDS) {
+      const hide = this.settings?.get_boolean(SETTING_KEYS[kind]) ?? false;
+      this.applyHide(ps, kind, hide);
+    }
   }
 
-  private updateMicrophone(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-microphone') ?? false;
-    this.applyHide(this.microphone, hide, 'microphone');
+  private updateAll(): void {
+    for (const ps of this.panelStates) {
+      this.refreshIndicators(ps);
+      for (const kind of KINDS) {
+        const hide = this.settings?.get_boolean(SETTING_KEYS[kind]) ?? false;
+        this.applyHide(ps, kind, hide);
+      }
+    }
   }
 
-  private updateVolume(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-volume') ?? false;
-    this.applyHide(this.volumeOutput, hide, 'volume');
-  }
-
-  private updateBluetooth(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-bluetooth') ?? false;
-    this.applyHide(this.bluetooth, hide, 'bluetooth');
-  }
-
-  private updateNetwork(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-network') ?? false;
-    this.applyHide(this.network, hide, 'network');
-  }
-
-  private updatePower(): void {
-    this.refreshIndicators();
-    const hide = this.settings?.get_boolean('hide-power') ?? false;
-    this.applyHide(this.power, hide, 'power');
-  }
-
-  private applyHide(indicator: Hideable | null, hide: boolean, kind: 'volume' | 'network' | 'power' | 'bluetooth' | 'microphone'): void {
+  private applyHide(ps: PanelState, kind: IndicatorKind, hide: boolean): void {
+    const indicator = ps.indicators[kind];
     if (!indicator) return;
-    const existing = this.getSignalId(kind);
+
+    const existing = ps.signalIds[kind];
     if (hide) {
       indicator.hide();
       if (existing === null) {
         const id = indicator.connect('notify::visible', () => indicator.hide());
-        this.setSignalId(kind, id);
+        ps.signalIds[kind] = id;
       }
     } else {
       if (existing !== null) {
         indicator.disconnect(existing);
-        this.setSignalId(kind, null);
+        ps.signalIds[kind] = null;
       }
       indicator.show();
     }
