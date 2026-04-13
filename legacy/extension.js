@@ -212,7 +212,10 @@ function onDtpPanelsChanged() {
  * called, which only happens after the initial idle loop completes.
  */
 function scheduleApply() {
-  if (idleSource) return;
+  if (idleSource) {
+    GLib.Source.remove(idleSource);
+    idleSource = 0;
+  }
   let retries = 0;
   idleSource = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
     setupAllPanels();
