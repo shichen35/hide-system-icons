@@ -23,6 +23,7 @@ $(SCHEMAS): schemas/org.gnome.shell.extensions.$(NAME).gschema.xml
 
 $(MODERN_ZIP): dist/extension.js dist/prefs.js $(SCHEMAS)
 	@cp -r schemas metadata.json dist/
+	@rm -f dist/schemas/gschemas.compiled
 	@cp -f $(EXTRAS) dist/ 2>/dev/null || true
 	@cd dist && zip -9r ../$@ .
 
@@ -45,6 +46,7 @@ install-legacy: $(LEGACY_ZIP)
 install-modern install-legacy:
 	@rm -rf $(EXT_DIR) && mkdir -p $(EXT_DIR)
 	@cp -r $(SRC)/* $(EXT_DIR)/
+	@glib-compile-schemas $(EXT_DIR)/schemas/
 
 clean:
 	@rm -rf dist legacy-dist node_modules $(MODERN_ZIP) $(LEGACY_ZIP) $(NAME)-gnome-45-49.zip
