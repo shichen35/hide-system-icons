@@ -26,5 +26,10 @@
       <summary>Hide microphone icon</summary>
       <description>If toggled, hides the microphone icon in the Quick Settings panel.</description>
     </key>
+    <key name="hide-power-profiles" type="b">
+      <default>false</default>
+      <summary>Hide power profiles icon</summary>
+      <description>If toggled, hides the power profiles icon in the Quick Settings panel.</description>
+    </key>
   </schema>
 </schemalist>

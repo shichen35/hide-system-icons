@@ -16,11 +16,12 @@ interface QuickSettingsPanel {
   _bluetooth?: Hideable | null;
   _network?: Hideable | null;
   _system?: Hideable | null;
+  _powerProfiles?: Hideable | null;
   _indicators?: any | null;
   _grid?: any | null;
 }
 
-type IndicatorKind = 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power';
+type IndicatorKind = 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' | 'powerProfiles';
 
 const SETTING_KEYS: Record<IndicatorKind, string> = {
   microphone: 'hide-microphone',
@@ -28,6 +29,7 @@ const SETTING_KEYS: Record<IndicatorKind, string> = {
   bluetooth: 'hide-bluetooth',
   network: 'hide-network',
   power: 'hide-power',
+  powerProfiles: 'hide-power-profiles',
 };
 
 const QS_FIELDS: Record<IndicatorKind, keyof QuickSettingsPanel> = {
@@ -36,17 +38,18 @@ const QS_FIELDS: Record<IndicatorKind, keyof QuickSettingsPanel> = {
   bluetooth: '_bluetooth',
   network: '_network',
   power: '_system',
+  powerProfiles: '_powerProfiles',
 };
 
-const KINDS: IndicatorKind[] = ['microphone', 'volume', 'bluetooth', 'network', 'power'];
+const KINDS: IndicatorKind[] = ['microphone', 'volume', 'bluetooth', 'network', 'power', 'powerProfiles'];
 
 class PanelState {
   qs: QuickSettingsPanel;
   indicators: Record<IndicatorKind, Hideable | null> = {
-    microphone: null, volume: null, bluetooth: null, network: null, power: null,
+    microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
   };
   signalIds: Record<IndicatorKind, number | null> = {
-    microphone: null, volume: null, bluetooth: null, network: null, power: null,
+    microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
   };
   container: any | null = null;
   containerAddedHandler: number | null = null;
