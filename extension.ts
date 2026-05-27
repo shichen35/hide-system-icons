@@ -6,8 +6,8 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 interface Hideable {
   hide(): void;
   show(): void;
-  connect(signal: string, callback: () => void): number;
-  disconnect(handlerId: number): void;
+  connectObject(...args: any[]): void;
+  disconnectObject(object: object): void;
 }
 
 interface QuickSettingsPanel {
@@ -48,12 +48,10 @@ class PanelState {
   indicators: Record<IndicatorKind, Hideable | null> = {
     microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
   };
-  signalIds: Record<IndicatorKind, number | null> = {
-    microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
-  };
+  /** Kinds whose indicator currently has a notify::visible handler connected. */
+  connectedKinds: Set<IndicatorKind> = new Set();
   container: any | null = null;
-  containerAddedHandler: number | null = null;
-  containerRemovedHandler: number | null = null;
+  containerWatched: boolean = false;
 
   constructor(qs: QuickSettingsPanel) {
     this.qs = qs;
@@ -63,16 +61,15 @@ class PanelState {
 export default class HideSystemIcons extends Extension {
   private sourceId: number | null = null;
   private settings: Gio.Settings | null = null;
-  private settingsSignalIds: number[] = [];
   private panelStates: PanelState[] = [];
-  private dtpPanelsSignal: number | null = null;
 
   enable(): void {
     this.settings = this.getSettings();
 
     for (const kind of KINDS) {
-      this.settingsSignalIds.push(
-        this.settings.connect(`changed::${SETTING_KEYS[kind]}`, () => this.updateAll()),
+      (this.settings as any).connectObject(
+        `changed::${SETTING_KEYS[kind]}`, () => this.updateAll(),
+        this,
       );
     }
 
@@ -107,8 +104,7 @@ export default class HideSystemIcons extends Extension {
     }
 
     if (this.settings) {
-      for (const id of this.settingsSignalIds) this.settings.disconnect(id);
-      this.settingsSignalIds = [];
+      (this.settings as any).disconnectObject(this);
       this.settings = null;
     }
 
@@ -125,16 +121,12 @@ export default class HideSystemIcons extends Extension {
     if (mainQs) result.push(mainQs);
 
     // Dash to Panel creates separate quickSettings on secondary monitors
-    try {
-      const dtpPanels = (global as any).dashToPanel?.panels;
-      if (dtpPanels) {
-        for (const p of dtpPanels) {
-          const qs = p.statusArea?.quickSettings as unknown as QuickSettingsPanel | undefined;
-          if (qs && qs !== mainQs) result.push(qs);
-        }
+    const dtpPanels = (global as any).dashToPanel?.panels;
+    if (dtpPanels) {
+      for (const p of dtpPanels) {
+        const qs = p.statusArea?.quickSettings as unknown as QuickSettingsPanel | undefined;
+        if (qs && qs !== mainQs) result.push(qs);
       }
-    } catch (e) {
-      console.warn(`hide-system-icons: error reading DtP panels: ${e}`);
     }
 
     return result;
@@ -159,36 +151,24 @@ export default class HideSystemIcons extends Extension {
     for (const kind of KINDS) {
       const indicator = ps.indicators[kind];
       if (!indicator) continue;
-      const signalId = ps.signalIds[kind];
-      if (signalId !== null) {
-        indicator.disconnect(signalId);
-        ps.signalIds[kind] = null;
-      }
+      if (ps.connectedKinds.has(kind))
+        indicator.disconnectObject(ps);
       indicator.show();
       ps.indicators[kind] = null;
     }
+    ps.connectedKinds.clear();
   }
 
   private watchDtpPanels(): void {
-    try {
-      const dtp = (global as any).dashToPanel;
-      if (dtp && this.dtpPanelsSignal === null) {
-        this.dtpPanelsSignal = dtp.connect('panels-created', () => this.onDtpPanelsChanged());
-      }
-    } catch (e) {
-      console.warn(`hide-system-icons: error connecting to DtP panels-created signal: ${e}`);
-    }
+    const dtp = (global as any).dashToPanel;
+    if (dtp)
+      dtp.connectObject('panels-created', () => this.onDtpPanelsChanged(), this);
   }
 
   private unwatchDtpPanels(): void {
-    try {
-      if (this.dtpPanelsSignal !== null && (global as any).dashToPanel) {
-        (global as any).dashToPanel.disconnect(this.dtpPanelsSignal);
-      }
-    } catch (e) {
-      console.warn(`hide-system-icons: error disconnecting DtP signal: ${e}`);
-    }
-    this.dtpPanelsSignal = null;
+    const dtp = (global as any).dashToPanel;
+    if (dtp)
+      dtp.disconnectObject(this);
   }
 
   private onDtpPanelsChanged(): void {
@@ -205,9 +185,9 @@ export default class HideSystemIcons extends Extension {
       const newIndicator = (ps.qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
       const oldIndicator = ps.indicators[kind];
       if (newIndicator !== oldIndicator) {
-        if (oldIndicator && ps.signalIds[kind] !== null) {
-          oldIndicator.disconnect(ps.signalIds[kind]!);
-          ps.signalIds[kind] = null;
+        if (oldIndicator && ps.connectedKinds.has(kind)) {
+          oldIndicator.disconnectObject(ps);
+          ps.connectedKinds.delete(kind);
         }
         ps.indicators[kind] = newIndicator;
       }
@@ -223,27 +203,21 @@ export default class HideSystemIcons extends Extension {
 
   private attachRebuildWatch(ps: PanelState): void {
     const container = ps.container ?? (ps.qs._indicators ?? ps.qs._grid ?? null);
-    if (!container) return;
+    if (!container || ps.containerWatched) return;
     ps.container = container;
-    if (ps.containerAddedHandler === null) {
-      ps.containerAddedHandler = container.connect('child-added', () => this.reapplyAll(ps));
-    }
-    if (ps.containerRemovedHandler === null) {
-      ps.containerRemovedHandler = container.connect('child-removed', () => this.reapplyAll(ps));
-    }
+    container.connectObject(
+      'child-added', () => this.reapplyAll(ps),
+      'child-removed', () => this.reapplyAll(ps),
+      ps,
+    );
+    ps.containerWatched = true;
   }
 
   private detachRebuildWatch(ps: PanelState): void {
-    if (!ps.container) return;
-    if (ps.containerAddedHandler !== null) {
-      ps.container.disconnect(ps.containerAddedHandler);
-      ps.containerAddedHandler = null;
-    }
-    if (ps.containerRemovedHandler !== null) {
-      ps.container.disconnect(ps.containerRemovedHandler);
-      ps.containerRemovedHandler = null;
-    }
+    if (!ps.container || !ps.containerWatched) return;
+    ps.container.disconnectObject(ps);
     ps.container = null;
+    ps.containerWatched = false;
   }
 
   private reapplyAll(ps: PanelState): void {
@@ -268,17 +242,16 @@ export default class HideSystemIcons extends Extension {
     const indicator = ps.indicators[kind];
     if (!indicator) return;
 
-    const existing = ps.signalIds[kind];
     if (hide) {
       indicator.hide();
-      if (existing === null) {
-        const id = indicator.connect('notify::visible', () => indicator.hide());
-        ps.signalIds[kind] = id;
+      if (!ps.connectedKinds.has(kind)) {
+        indicator.connectObject('notify::visible', () => indicator.hide(), ps);
+        ps.connectedKinds.add(kind);
       }
     } else {
-      if (existing !== null) {
-        indicator.disconnect(existing);
-        ps.signalIds[kind] = null;
+      if (ps.connectedKinds.has(kind)) {
+        indicator.disconnectObject(ps);
+        ps.connectedKinds.delete(kind);
       }
       indicator.show();
     }

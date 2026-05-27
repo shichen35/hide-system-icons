@@ -135,16 +135,12 @@ function getAllMenus() {
   // Dash to Panel exposes per-monitor panels via global.dashToPanel.panels.
   // On GNOME 40-42 each standalone panel has its own statusArea.aggregateMenu;
   // on GNOME 43-44 it has statusArea.quickSettings.
-  try {
-    const dtpPanels = global.dashToPanel && global.dashToPanel.panels;
-    if (dtpPanels) {
-      for (const p of dtpPanels) {
-        const menu = p.statusArea && p.statusArea[menuName];
-        if (menu && menu !== mainMenu) result.push({ menu, isQs });
-      }
+  const dtpPanels = global.dashToPanel && global.dashToPanel.panels;
+  if (dtpPanels) {
+    for (const p of dtpPanels) {
+      const menu = p.statusArea && p.statusArea[menuName];
+      if (menu && menu !== mainMenu) result.push({ menu, isQs });
     }
-  } catch (e) {
-    log(`hide-system-icons: error reading DtP panels: ${e}`);
   }
 
   return result;
@@ -173,24 +169,14 @@ function cleanupPanelState(ps) {
 }
 
 function watchDtpPanels() {
-  try {
-    const dtp = global.dashToPanel;
-    if (dtp && !dtpSignal) {
-      dtpSignal = dtp.connect('panels-created', onDtpPanelsChanged);
-    }
-  } catch (e) {
-    log(`hide-system-icons: error connecting to DtP panels-created signal: ${e}`);
-  }
+  const dtp = global.dashToPanel;
+  if (dtp && !dtpSignal)
+    dtpSignal = dtp.connect('panels-created', onDtpPanelsChanged);
 }
 
 function unwatchDtpPanels() {
-  try {
-    if (dtpSignal && global.dashToPanel) {
-      global.dashToPanel.disconnect(dtpSignal);
-    }
-  } catch (e) {
-    log(`hide-system-icons: error disconnecting DtP signal: ${e}`);
-  }
+  if (dtpSignal && global.dashToPanel)
+    global.dashToPanel.disconnect(dtpSignal);
   dtpSignal = 0;
 }
 

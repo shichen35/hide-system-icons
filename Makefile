@@ -6,7 +6,7 @@ EXT_DIR = ~/.local/share/gnome-shell/extensions/$(UUID)
 MODERN_ZIP = $(NAME)-gnome-45-50.zip
 LEGACY_ZIP = $(NAME)-gnome-40-44.zip
 SCHEMAS = schemas/gschemas.compiled
-EXTRAS = icon.png README.md LICENSE
+EXTRAS = README.md LICENSE
 
 .PHONY: all pack pack-modern pack-legacy install install-modern install-legacy clean
 
