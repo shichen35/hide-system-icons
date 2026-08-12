@@ -1,3 +1,5 @@
+import { QSField } from "./indicators.js";
+
 export interface Hideable {
   hide(): void;
   show(): void;
@@ -6,6 +8,11 @@ export interface Hideable {
   disconnectObject(object: object): void;
 }
 
+export type QuickSettingsPanel = { [K in QSField]?: Hideable | null } & {
+  _indicators?: any | null;
+  _grid?: any | null;
+};
+
 export class HiddenIndicator {
   private readonly indicator: Hideable;
   private hiding: boolean = false;
@@ -13,6 +20,10 @@ export class HiddenIndicator {
 
   constructor(indicator: Hideable) {
     this.indicator = indicator;
+  }
+
+  wraps(indicator: Hideable): boolean {
+    return this.indicator === indicator;
   }
 
   hide(): void {

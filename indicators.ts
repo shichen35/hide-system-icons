@@ -1,9 +1,11 @@
 export type IndicatorKind = 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' | 'powerProfiles';
 
+export type QSField = '_volumeInput' | '_volumeOutput' | '_bluetooth' | '_network' | '_powerProfiles' | '_system';
+
 export interface IndicatorRow {
   kind: IndicatorKind;
   settingKey: string;
-  qsField: string;
+  qsField: QSField;
   title: string;
   subtitle: string;
   since: number;
