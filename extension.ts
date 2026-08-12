@@ -2,13 +2,7 @@ import GLib from "gi://GLib";
 import Gio from "gi://Gio";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
-
-interface Hideable {
-  hide(): void;
-  show(): void;
-  connectObject(...args: any[]): void;
-  disconnectObject(object: object): void;
-}
+import { HiddenIndicator, Hideable } from "./hiddenIndicator.js";
 
 interface QuickSettingsPanel {
   _volumeInput?: Hideable | null;
@@ -45,11 +39,12 @@ const KINDS: IndicatorKind[] = ['microphone', 'volume', 'bluetooth', 'network', 
 
 class PanelState {
   qs: QuickSettingsPanel;
-  indicators: Record<IndicatorKind, Hideable | null> = {
+  indicators: Record<IndicatorKind, HiddenIndicator | null> = {
     microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
   };
-  /** Kinds whose indicator currently has a notify::visible handler connected. */
-  connectedKinds: Set<IndicatorKind> = new Set();
+  rawIndicators: Record<IndicatorKind, Hideable | null> = {
+    microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
+  };
   container: any | null = null;
   containerWatched: boolean = false;
 
@@ -140,7 +135,9 @@ export default class HideSystemIcons extends Extension {
       if (existingQs.has(qs)) continue;
       const ps = new PanelState(qs);
       for (const kind of KINDS) {
-        ps.indicators[kind] = (qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
+        const raw = (qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
+        ps.rawIndicators[kind] = raw;
+        ps.indicators[kind] = raw ? new HiddenIndicator(raw) : null;
       }
       this.panelStates.push(ps);
     }
@@ -149,14 +146,10 @@ export default class HideSystemIcons extends Extension {
   private cleanupPanelState(ps: PanelState): void {
     this.detachRebuildWatch(ps);
     for (const kind of KINDS) {
-      const indicator = ps.indicators[kind];
-      if (!indicator) continue;
-      if (ps.connectedKinds.has(kind))
-        indicator.disconnectObject(ps);
-      indicator.show();
+      ps.indicators[kind]?.dispose();
       ps.indicators[kind] = null;
+      ps.rawIndicators[kind] = null;
     }
-    ps.connectedKinds.clear();
   }
 
   private watchDtpPanels(): void {
@@ -182,14 +175,12 @@ export default class HideSystemIcons extends Extension {
 
   private refreshIndicators(ps: PanelState): void {
     for (const kind of KINDS) {
-      const newIndicator = (ps.qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
-      const oldIndicator = ps.indicators[kind];
-      if (newIndicator !== oldIndicator) {
-        if (oldIndicator && ps.connectedKinds.has(kind)) {
-          oldIndicator.disconnectObject(ps);
-          ps.connectedKinds.delete(kind);
-        }
-        ps.indicators[kind] = newIndicator;
+      const newRaw = (ps.qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
+      const oldRaw = ps.rawIndicators[kind];
+      if (newRaw !== oldRaw) {
+        ps.indicators[kind]?.dispose();
+        ps.indicators[kind] = newRaw ? new HiddenIndicator(newRaw) : null;
+        ps.rawIndicators[kind] = newRaw;
       }
     }
 
@@ -242,18 +233,7 @@ export default class HideSystemIcons extends Extension {
     const indicator = ps.indicators[kind];
     if (!indicator) return;
 
-    if (hide) {
-      indicator.hide();
-      if (!ps.connectedKinds.has(kind)) {
-        indicator.connectObject('notify::visible', () => indicator.hide(), ps);
-        ps.connectedKinds.add(kind);
-      }
-    } else {
-      if (ps.connectedKinds.has(kind)) {
-        indicator.disconnectObject(ps);
-        ps.connectedKinds.delete(kind);
-      }
-      indicator.show();
-    }
+    if (hide) indicator.hide();
+    else indicator.restore();
   }
 }
