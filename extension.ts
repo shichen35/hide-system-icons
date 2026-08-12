@@ -3,6 +3,7 @@ import Gio from "gi://Gio";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import { HiddenIndicator, Hideable } from "./hiddenIndicator.js";
+import { IndicatorKind, INDICATORS } from "./indicators.js";
 
 interface QuickSettingsPanel {
   _volumeInput?: Hideable | null;
@@ -15,41 +16,21 @@ interface QuickSettingsPanel {
   _grid?: any | null;
 }
 
-type IndicatorKind = 'microphone' | 'volume' | 'bluetooth' | 'network' | 'power' | 'powerProfiles';
-
-const SETTING_KEYS: Record<IndicatorKind, string> = {
-  microphone: 'hide-microphone',
-  volume: 'hide-volume',
-  bluetooth: 'hide-bluetooth',
-  network: 'hide-network',
-  power: 'hide-power',
-  powerProfiles: 'hide-power-profiles',
-};
-
-const QS_FIELDS: Record<IndicatorKind, keyof QuickSettingsPanel> = {
-  microphone: '_volumeInput',
-  volume: '_volumeOutput',
-  bluetooth: '_bluetooth',
-  network: '_network',
-  power: '_system',
-  powerProfiles: '_powerProfiles',
-};
-
-const KINDS: IndicatorKind[] = ['microphone', 'volume', 'bluetooth', 'network', 'power', 'powerProfiles'];
-
 class PanelState {
   qs: QuickSettingsPanel;
-  indicators: Record<IndicatorKind, HiddenIndicator | null> = {
-    microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
-  };
-  rawIndicators: Record<IndicatorKind, Hideable | null> = {
-    microphone: null, volume: null, bluetooth: null, network: null, power: null, powerProfiles: null,
-  };
+  indicators: Record<IndicatorKind, HiddenIndicator | null>;
+  rawIndicators: Record<IndicatorKind, Hideable | null>;
   container: any | null = null;
   containerWatched: boolean = false;
 
   constructor(qs: QuickSettingsPanel) {
     this.qs = qs;
+    this.indicators = {} as Record<IndicatorKind, HiddenIndicator | null>;
+    this.rawIndicators = {} as Record<IndicatorKind, Hideable | null>;
+    for (const row of INDICATORS) {
+      this.indicators[row.kind] = null;
+      this.rawIndicators[row.kind] = null;
+    }
   }
 }
 
@@ -61,9 +42,9 @@ export default class HideSystemIcons extends Extension {
   enable(): void {
     this.settings = this.getSettings();
 
-    for (const kind of KINDS) {
+    for (const row of INDICATORS) {
       (this.settings as any).connectObject(
-        `changed::${SETTING_KEYS[kind]}`, () => this.updateAll(),
+        `changed::${row.settingKey}`, () => this.updateAll(),
         this,
       );
     }
@@ -79,7 +60,7 @@ export default class HideSystemIcons extends Extension {
       for (const ps of this.panelStates) this.refreshIndicators(ps);
 
       const allReady = this.panelStates.length > 0 &&
-        this.panelStates.every(ps => KINDS.every(kind => ps.indicators[kind] !== null));
+        this.panelStates.every(ps => INDICATORS.every(row => ps.indicators[row.kind] !== null));
 
       if (!allReady && ++retries < 50) return GLib.SOURCE_CONTINUE;
 
@@ -134,10 +115,10 @@ export default class HideSystemIcons extends Extension {
     for (const qs of allQs) {
       if (existingQs.has(qs)) continue;
       const ps = new PanelState(qs);
-      for (const kind of KINDS) {
-        const raw = (qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
-        ps.rawIndicators[kind] = raw;
-        ps.indicators[kind] = raw ? new HiddenIndicator(raw) : null;
+      for (const row of INDICATORS) {
+        const raw = (qs[row.qsField as keyof QuickSettingsPanel] ?? null) as Hideable | null;
+        ps.rawIndicators[row.kind] = raw;
+        ps.indicators[row.kind] = raw ? new HiddenIndicator(raw) : null;
       }
       this.panelStates.push(ps);
     }
@@ -145,10 +126,10 @@ export default class HideSystemIcons extends Extension {
 
   private cleanupPanelState(ps: PanelState): void {
     this.detachRebuildWatch(ps);
-    for (const kind of KINDS) {
-      ps.indicators[kind]?.dispose();
-      ps.indicators[kind] = null;
-      ps.rawIndicators[kind] = null;
+    for (const row of INDICATORS) {
+      ps.indicators[row.kind]?.dispose();
+      ps.indicators[row.kind] = null;
+      ps.rawIndicators[row.kind] = null;
     }
   }
 
@@ -174,13 +155,13 @@ export default class HideSystemIcons extends Extension {
   }
 
   private refreshIndicators(ps: PanelState): void {
-    for (const kind of KINDS) {
-      const newRaw = (ps.qs[QS_FIELDS[kind]] ?? null) as Hideable | null;
-      const oldRaw = ps.rawIndicators[kind];
+    for (const row of INDICATORS) {
+      const newRaw = (ps.qs[row.qsField as keyof QuickSettingsPanel] ?? null) as Hideable | null;
+      const oldRaw = ps.rawIndicators[row.kind];
       if (newRaw !== oldRaw) {
-        ps.indicators[kind]?.dispose();
-        ps.indicators[kind] = newRaw ? new HiddenIndicator(newRaw) : null;
-        ps.rawIndicators[kind] = newRaw;
+        ps.indicators[row.kind]?.dispose();
+        ps.indicators[row.kind] = newRaw ? new HiddenIndicator(newRaw) : null;
+        ps.rawIndicators[row.kind] = newRaw;
       }
     }
 
@@ -213,18 +194,18 @@ export default class HideSystemIcons extends Extension {
 
   private reapplyAll(ps: PanelState): void {
     this.refreshIndicators(ps);
-    for (const kind of KINDS) {
-      const hide = this.settings?.get_boolean(SETTING_KEYS[kind]) ?? false;
-      this.applyHide(ps, kind, hide);
+    for (const row of INDICATORS) {
+      const hide = this.settings?.get_boolean(row.settingKey) ?? false;
+      this.applyHide(ps, row.kind, hide);
     }
   }
 
   private updateAll(): void {
     for (const ps of this.panelStates) {
       this.refreshIndicators(ps);
-      for (const kind of KINDS) {
-        const hide = this.settings?.get_boolean(SETTING_KEYS[kind]) ?? false;
-        this.applyHide(ps, kind, hide);
+      for (const row of INDICATORS) {
+        const hide = this.settings?.get_boolean(row.settingKey) ?? false;
+        this.applyHide(ps, row.kind, hide);
       }
     }
   }
