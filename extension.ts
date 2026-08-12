@@ -10,6 +10,7 @@ export default class HideSystemIcons extends Extension {
   private sourceId: number | null = null;
   private settings: Gio.Settings | null = null;
   private bindings: PanelBinding[] = [];
+  private dtpWatched: boolean = false;
 
   enable(): void {
     this.settings = this.getSettings();
@@ -30,9 +31,8 @@ export default class HideSystemIcons extends Extension {
     this.sourceId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
       this.setupAllPanels();
 
-      const allQs = this.getAllQuickSettings();
-      const allReady = allQs.length > 0 &&
-        allQs.every(qs => INDICATORS.every(row => (qs[row.qsField] ?? null) !== null));
+      for (const binding of this.bindings) binding.refresh();
+      const allReady = this.bindings.length > 0 && this.bindings.every(binding => binding.isReady());
 
       if (!allReady && ++retries < 50) return GLib.SOURCE_CONTINUE;
 
@@ -45,6 +45,10 @@ export default class HideSystemIcons extends Extension {
   }
 
   disable(): void {
+    this.teardown();
+  }
+
+  private teardown(): void {
     if (this.sourceId !== null) {
       GLib.Source.remove(this.sourceId);
       this.sourceId = null;
@@ -89,14 +93,17 @@ export default class HideSystemIcons extends Extension {
 
   private watchDtpPanels(): void {
     const dtp = (global as any).dashToPanel;
-    if (dtp)
+    if (dtp && !this.dtpWatched) {
       dtp.connectObject('panels-created', () => this.onDtpPanelsChanged(), this);
+      this.dtpWatched = true;
+    }
   }
 
   private unwatchDtpPanels(): void {
     const dtp = (global as any).dashToPanel;
     if (dtp)
       dtp.disconnectObject(this);
+    this.dtpWatched = false;
   }
 
   private onDtpPanelsChanged(): void {

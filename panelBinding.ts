@@ -17,11 +17,15 @@ export class PanelBinding {
     for (const row of INDICATORS) this.indicators[row.kind] = null;
   }
 
+  refresh(): void {
+    for (const row of INDICATORS) this.resolveIndicator(row);
+    this.resolveContainer();
+  }
+
   sync(settings: SettingsReader): void {
     this.settings = settings;
 
-    for (const row of INDICATORS) this.resolveIndicator(row);
-    this.resolveContainer();
+    this.refresh();
 
     for (const row of INDICATORS) this.applyHide(row.kind, settings.get_boolean(row.settingKey));
   }
