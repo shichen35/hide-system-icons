@@ -21,7 +21,7 @@ export class HidePolicy {
   }
 
   start(): void {
-    this.port.watchSettings(() => this.updateAll());
+    this.port.watchSettings(() => this.onSettingsChanged());
 
     this.scheduleApply();
   }
@@ -76,5 +76,10 @@ export class HidePolicy {
   private updateAll(): void {
     const settings = this.port.settings();
     for (const binding of this.bindings) binding.sync(settings);
+  }
+
+  private onSettingsChanged(): void {
+    this.updateAll();
+    this.port.watchPanels(() => this.onPanelsChanged());
   }
 }

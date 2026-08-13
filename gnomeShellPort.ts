@@ -12,7 +12,6 @@ export class GnomeShellPort implements ShellPort {
   private sourceId: number | null = null;
   private settingsWatched: boolean = false;
   private panelsWatched: boolean = false;
-  private selfChecked: boolean = false;
 
   constructor(gsettings: Gio.Settings) {
     this.gsettings = gsettings;
@@ -83,26 +82,22 @@ export class GnomeShellPort implements ShellPort {
   }
 
   private selfCheck(): void {
-    if (this.selfChecked) return;
-    this.selfChecked = true;
-
-    const panel = this.panels()[0];
-    if (!panel) return;
-
     const runningMajor = parseInt(Config.PACKAGE_VERSION.split('.')[0], 10);
 
-    if (!isNaN(runningMajor)) {
-      const missingFields = INDICATORS.filter(row => row.since <= runningMajor && !(row.qsField in panel));
-      if (missingFields.length > 0) {
-        const details = missingFields.map(row => `${row.kind} (${row.qsField})`).join(', ');
-        console.warn(`hide-system-icons: catalog names fields this Shell does not have: ${details}`);
+    for (const panel of this.panels()) {
+      if (!isNaN(runningMajor)) {
+        const missingFields = INDICATORS.filter(row => row.since <= runningMajor && !(row.qsField in panel));
+        if (missingFields.length > 0) {
+          const details = missingFields.map(row => `${row.kind} (${row.qsField})`).join(', ');
+          console.warn(`hide-system-icons: catalog names fields this Shell does not have: ${details}`);
+        }
       }
-    }
 
-    const missingRequired = INDICATORS.filter(row => row.required && (panel[row.qsField] ?? null) === null);
-    if (missingRequired.length > 0) {
-      const details = missingRequired.map(row => `${row.kind} (${row.qsField})`).join(', ');
-      console.warn(`hide-system-icons: required indicator never appeared: ${details}`);
+      const missingRequired = INDICATORS.filter(row => row.required && (panel[row.qsField] ?? null) === null);
+      if (missingRequired.length > 0) {
+        const details = missingRequired.map(row => `${row.kind} (${row.qsField})`).join(', ');
+        console.warn(`hide-system-icons: required indicator never appeared: ${details}`);
+      }
     }
   }
 }
