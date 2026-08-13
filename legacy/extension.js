@@ -54,6 +54,12 @@ function disconnectSignal(target, id) {
   }
 }
 
+function isVisible(target) {
+  if (!target) return false;
+  if (typeof target.visible === 'boolean') return target.visible;
+  return target.actor && typeof target.actor.visible === 'boolean' ? target.actor.visible : false;
+}
+
 const KINDS = ['microphone', 'volume', 'bluetooth', 'network', 'power'];
 const SETTING_KEYS = {
   microphone: 'hide-microphone',
@@ -79,6 +85,7 @@ function makePanelState(menu, isQs) {
     isQs,
     indicators: { microphone: null, volume: null, bluetooth: null, network: null, power: null },
     signals:    { microphone: 0,    volume: 0,    bluetooth: 0,    network: 0,    power: 0    },
+    wanted:     { microphone: null, volume: null, bluetooth: null, network: null, power: null },
     container: null,
     addedHandler: 0,
     removedHandler: 0,
@@ -92,7 +99,7 @@ function enable() {
   settingsSignalIds = [];
 
   for (const kind of KINDS) {
-    settingsSignalIds.push(settings.connect(`changed::${SETTING_KEYS[kind]}`, updateAll));
+    settingsSignalIds.push(settings.connect(`changed::${SETTING_KEYS[kind]}`, onSettingsChanged));
   }
 
   scheduleApply();
@@ -156,14 +163,22 @@ function setupAllPanels() {
   }
 }
 
+function restoreIndicator(ps, kind) {
+  const indicator = ps.indicators[kind];
+  const signalId = ps.signals[kind];
+  if (indicator && signalId) disconnectSignal(indicator, signalId);
+  ps.signals[kind] = 0;
+  if (indicator && ps.wanted[kind] !== null) {
+    if (ps.wanted[kind]) doShow(indicator);
+    else doHide(indicator);
+  }
+}
+
 function cleanupPanelState(ps) {
   detachRebuildWatch(ps);
   for (const kind of KINDS) {
-    const indicator = ps.indicators[kind];
-    const signalId = ps.signals[kind];
-    if (indicator && signalId) disconnectSignal(indicator, signalId);
-    ps.signals[kind] = 0;
-    doShow(indicator);
+    restoreIndicator(ps, kind);
+    ps.wanted[kind] = null;
     ps.indicators[kind] = null;
   }
 }
@@ -209,9 +224,10 @@ function scheduleApply() {
 
     // Only require indicators that are guaranteed present on all supported
     // versions. Microphone may be absent on GNOME 40-42 aggregate menu;
-    // bluetooth may be absent on systems without hardware.
+    // bluetooth may be absent on systems without hardware; network may be
+    // absent on shells built without NetworkManager.
     const allReady = panelStates.length > 0 &&
-      panelStates.every(ps => ps.indicators.volume && ps.indicators.network && ps.indicators.power);
+      panelStates.every(ps => ps.indicators.volume && ps.indicators.power);
 
     if (!allReady && ++retries < 50) return GLib.SOURCE_CONTINUE;
 
@@ -314,12 +330,9 @@ function refreshAggIndicators(ps) {
 
 function replaceIndicator(ps, kind, newIndicator) {
   const oldIndicator = ps.indicators[kind];
-  const signalId = ps.signals[kind];
   if (oldIndicator === newIndicator) return;
-  if (oldIndicator && signalId) {
-    disconnectSignal(oldIndicator, signalId);
-    ps.signals[kind] = 0;
-  }
+  restoreIndicator(ps, kind);
+  ps.wanted[kind] = null;
   ps.indicators[kind] = newIndicator;
 }
 
@@ -354,20 +367,28 @@ function updateAll() {
   }
 }
 
+function onSettingsChanged() {
+  updateAll();
+  watchDtpPanels();
+}
+
 function applyHide(ps, kind, hide) {
   const indicator = ps.indicators[kind];
   if (!indicator) return;
   const signalId = ps.signals[kind];
   if (hide) {
-    doHide(indicator);
-    if (!signalId)
-      ps.signals[kind] = connectVisibleNotify(indicator, () => doHide(indicator));
-  } else {
-    if (signalId) {
-      disconnectSignal(indicator, signalId);
-      ps.signals[kind] = 0;
+    if (!signalId) {
+      ps.wanted[kind] = isVisible(indicator);
+      ps.signals[kind] = connectVisibleNotify(indicator, () => {
+        if (isVisible(indicator)) {
+          ps.wanted[kind] = true;
+          doHide(indicator);
+        }
+      });
     }
-    doShow(indicator);
+    doHide(indicator);
+  } else {
+    restoreIndicator(ps, kind);
   }
 }
 
