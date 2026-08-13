@@ -57,7 +57,7 @@ export const INDICATORS: readonly IndicatorRow[] = [
     qsField: '_powerProfiles',
     title: N_('Hide power profiles'),
     subtitle: N_('Hide the power profiles indicator.'),
-    since: 50,
+    since: 45,
     required: false,
   },
   {

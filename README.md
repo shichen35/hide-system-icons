@@ -20,7 +20,7 @@ Install from GNOME Extensions: [Hide System Icons](https://extensions.gnome.org/
 - Hide Bluetooth icon
 - Hide network icon
 - Hide power icon
-- Hide power profiles icon (GNOME 50+)
+- Hide power profiles icon
 - Changes apply immediately and persist across restarts
 
 ## Settings
@@ -31,7 +31,7 @@ Preferences: Extensions app → this extension → Preferences. Available toggle
 - Hide volume icon
 - Hide Bluetooth icon
 - Hide network icon
-- Hide power profiles icon (GNOME 50+)
+- Hide power profiles icon
 - Hide power icon
 
 GSettings (advanced):
