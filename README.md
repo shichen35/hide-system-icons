@@ -15,35 +15,47 @@ Install from GNOME Extensions: [Hide System Icons](https://extensions.gnome.org/
 
 ## Features
 
-- Hide microphone icon
-- Hide volume icon
-- Hide Bluetooth icon
-- Hide network icon
-- Hide power icon
-- Hide power profiles icon
+- Sound: hide volume, hide microphone
+- Privacy: hide camera, hide location, hide screen sharing
+- Connectivity: hide network, hide Bluetooth, hide airplane mode, hide Thunderbolt
+- Display: hide brightness, hide keyboard backlight, hide night light, hide dark mode, hide auto rotate
+- Power: hide power, hide power profiles
+- Status: hide Do Not Disturb (GNOME 49+), hide background apps
 - Changes apply immediately and persist across restarts
 
 ## Settings
 
-Preferences: Extensions app → this extension → Preferences. Available toggles:
+Preferences: Extensions app → this extension → Preferences. Toggles are grouped to match the Quick Settings panel:
 
-- Hide microphone icon
-- Hide volume icon
-- Hide Bluetooth icon
-- Hide network icon
-- Hide power profiles icon
-- Hide power icon
+- Sound: hide volume, hide microphone
+- Privacy: hide camera, hide location, hide screen sharing
+- Connectivity: hide network, hide Bluetooth, hide airplane mode, hide Thunderbolt
+- Display: hide brightness, hide keyboard backlight, hide night light, hide dark mode, hide auto rotate
+- Power: hide power, hide power profiles
+- Status: hide Do Not Disturb (GNOME 49+), hide background apps
 
 GSettings (advanced):
 
 - Schema: `org.gnome.shell.extensions.hide-system-icons`
 - Keys:
-  - `hide-microphone` (boolean)
   - `hide-volume` (boolean)
-  - `hide-bluetooth` (boolean)
+  - `hide-microphone` (boolean)
+  - `hide-camera` (boolean)
+  - `hide-location` (boolean)
+  - `hide-remote-access` (boolean)
   - `hide-network` (boolean)
-  - `hide-power-profiles` (boolean)
+  - `hide-bluetooth` (boolean)
+  - `hide-rfkill` (boolean)
+  - `hide-thunderbolt` (boolean)
+  - `hide-brightness` (boolean)
+  - `hide-backlight` (boolean)
+  - `hide-night-light` (boolean)
+  - `hide-dark-mode` (boolean)
+  - `hide-auto-rotate` (boolean)
   - `hide-power` (boolean)
+  - `hide-power-profiles` (boolean)
+  - `hide-do-not-disturb` (boolean)
+  - `hide-background-apps` (boolean)
 
 ## Manual installation (from source)
 

@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Toggle to hide the power profiles indicator in Quick Settings.
+- Toggles for 12 more Quick Settings indicators: camera, location, screen sharing, airplane mode, Thunderbolt, brightness, keyboard backlight, night light, dark mode, auto rotate, Do Not Disturb (GNOME 49+), and background apps.
+- Preferences are now grouped by category (Sound, Privacy, Connectivity, Display, Power, Status).
 
 ## [0.0.5] - 2026-04-10
 

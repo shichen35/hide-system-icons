@@ -31,5 +31,65 @@
       <summary>Hide power profiles icon</summary>
       <description>If toggled, hides the power profiles icon in the Quick Settings panel.</description>
     </key>
+    <key name="hide-camera" type="b">
+      <default>false</default>
+      <summary>Hide camera icon</summary>
+      <description>If toggled, hides the camera icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-location" type="b">
+      <default>false</default>
+      <summary>Hide location icon</summary>
+      <description>If toggled, hides the location icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-remote-access" type="b">
+      <default>false</default>
+      <summary>Hide screen sharing icon</summary>
+      <description>If toggled, hides the screen sharing icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-rfkill" type="b">
+      <default>false</default>
+      <summary>Hide airplane mode icon</summary>
+      <description>If toggled, hides the airplane mode icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-thunderbolt" type="b">
+      <default>false</default>
+      <summary>Hide Thunderbolt icon</summary>
+      <description>If toggled, hides the Thunderbolt icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-brightness" type="b">
+      <default>false</default>
+      <summary>Hide brightness icon</summary>
+      <description>If toggled, hides the brightness icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-backlight" type="b">
+      <default>false</default>
+      <summary>Hide keyboard backlight icon</summary>
+      <description>If toggled, hides the keyboard backlight icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-night-light" type="b">
+      <default>false</default>
+      <summary>Hide night light icon</summary>
+      <description>If toggled, hides the night light icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-dark-mode" type="b">
+      <default>false</default>
+      <summary>Hide dark mode icon</summary>
+      <description>If toggled, hides the dark mode icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-auto-rotate" type="b">
+      <default>false</default>
+      <summary>Hide auto rotate icon</summary>
+      <description>If toggled, hides the auto rotate icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-do-not-disturb" type="b">
+      <default>false</default>
+      <summary>Hide Do Not Disturb icon</summary>
+      <description>If toggled, hides the Do Not Disturb icon in the Quick Settings panel.</description>
+    </key>
+    <key name="hide-background-apps" type="b">
+      <default>false</default>
+      <summary>Hide background apps icon</summary>
+      <description>If toggled, hides the background apps icon in the Quick Settings panel.</description>
+    </key>
   </schema>
 </schemalist>
