@@ -60,14 +60,23 @@ function isVisible(target) {
   return target.actor && typeof target.actor.visible === 'boolean' ? target.actor.visible : false;
 }
 
-const KINDS = ['microphone', 'volume', 'bluetooth', 'network', 'power'];
-const SETTING_KEYS = {
-  microphone: 'hide-microphone',
-  volume:     'hide-volume',
-  bluetooth:  'hide-bluetooth',
-  network:    'hide-network',
-  power:      'hide-power',
-};
+const INDICATOR_ROWS = [
+  { kind: 'microphone',     key: 'hide-microphone',       agg: null,             qs: '_volumeInput' },
+  { kind: 'volume',         key: 'hide-volume',           agg: '_volume',        qs: '_volume' },
+  { kind: 'bluetooth',      key: 'hide-bluetooth',        agg: '_bluetooth',     qs: '_bluetooth' },
+  { kind: 'network',        key: 'hide-network',          agg: '_network',       qs: '_network' },
+  { kind: 'power',          key: 'hide-power',            agg: '_power',         qs: '_system' },
+  { kind: 'brightness',     key: 'hide-brightness',       agg: '_brightness',    qs: '_brightness' },
+  { kind: 'location',       key: 'hide-location',         agg: '_location',      qs: '_location' },
+  { kind: 'nightLight',     key: 'hide-night-light',      agg: '_nightLight',    qs: '_nightLight' },
+  { kind: 'remoteAccess',   key: 'hide-remote-access',    agg: '_remoteAccess',  qs: '_remoteAccess' },
+  { kind: 'rfkill',         key: 'hide-rfkill',           agg: '_rfkill',        qs: '_rfkill' },
+  { kind: 'thunderbolt',    key: 'hide-thunderbolt',      agg: '_thunderbolt',   qs: '_thunderbolt' },
+  { kind: 'powerProfiles',  key: 'hide-power-profiles',   agg: '_powerProfiles', qs: '_powerProfiles' },
+  { kind: 'darkMode',       key: 'hide-dark-mode',        agg: null,             qs: '_darkMode' },
+  { kind: 'autoRotate',     key: 'hide-auto-rotate',      agg: null,             qs: '_autoRotate' },
+  { kind: 'backgroundApps', key: 'hide-background-apps',  agg: null,             qs: '_backgroundApps' },
+];
 
 let settings = null;
 let idleSource = 0;
@@ -80,12 +89,20 @@ let dtpSignal = 0;
  * instance; `isQs` distinguishes which indicator layout to use.
  */
 function makePanelState(menu, isQs) {
+  const indicators = {};
+  const signals = {};
+  const wanted = {};
+  for (const row of INDICATOR_ROWS) {
+    indicators[row.kind] = null;
+    signals[row.kind] = 0;
+    wanted[row.kind] = null;
+  }
   return {
     menu,
     isQs,
-    indicators: { microphone: null, volume: null, bluetooth: null, network: null, power: null },
-    signals:    { microphone: 0,    volume: 0,    bluetooth: 0,    network: 0,    power: 0    },
-    wanted:     { microphone: null, volume: null, bluetooth: null, network: null, power: null },
+    indicators,
+    signals,
+    wanted,
     container: null,
     addedHandler: 0,
     removedHandler: 0,
@@ -98,8 +115,8 @@ function enable() {
   settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.hide-system-icons');
   settingsSignalIds = [];
 
-  for (const kind of KINDS) {
-    settingsSignalIds.push(settings.connect(`changed::${SETTING_KEYS[kind]}`, onSettingsChanged));
+  for (const row of INDICATOR_ROWS) {
+    settingsSignalIds.push(settings.connect(`changed::${row.key}`, onSettingsChanged));
   }
 
   scheduleApply();
@@ -176,10 +193,10 @@ function restoreIndicator(ps, kind) {
 
 function cleanupPanelState(ps) {
   detachRebuildWatch(ps);
-  for (const kind of KINDS) {
-    restoreIndicator(ps, kind);
-    ps.wanted[kind] = null;
-    ps.indicators[kind] = null;
+  for (const row of INDICATOR_ROWS) {
+    restoreIndicator(ps, row.kind);
+    ps.wanted[row.kind] = null;
+    ps.indicators[row.kind] = null;
   }
 }
 
@@ -241,8 +258,8 @@ function scheduleApply() {
 }
 
 function refreshIndicatorsForPanel(ps) {
+  refreshIndicators(ps);
   if (ps.isQs) {
-    refreshQsIndicators(ps);
     // QS containers emit child-added/child-removed on panel rebuilds
     const newContainer = ps.menu._indicators || ps.menu._grid || ps.menu._box || null;
     if (newContainer !== ps.container) {
@@ -250,82 +267,17 @@ function refreshIndicatorsForPanel(ps) {
       ps.container = newContainer;
       attachRebuildWatch(ps);
     }
-  } else {
-    refreshAggIndicators(ps);
-    // Aggregate menu does not have a rebuild-watchable container
   }
+  // Aggregate menu does not have a rebuild-watchable container
 }
 
-function refreshQsIndicators(ps) {
-  const qs = ps.menu;
-
-  let micCandidate = qs._volumeInput || null;
-  let volCandidate = qs._volumeOutput || qs._volume || qs._volumeItem || null;
-  let btCandidate  = qs._bluetooth   || qs._bluetoothItem || null;
-  let netCandidate = qs._network     || qs._networkItem   || null;
-  let powCandidate = qs._system      || qs._power         || qs._powerItem || null;
-
-  const findByName = (obj, names) => {
-    const keys = Object.keys(obj || {});
-    const lowerNames = names.map(n => String(n).toLowerCase());
-    for (const k of keys) {
-      const kl = k.toLowerCase();
-      if (lowerNames.some(n => kl.includes(n))) {
-        const val = obj[k];
-        if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
-          return val;
-      }
-    }
-    return null;
-  };
-
-  if (!micCandidate) micCandidate = findByName(qs, ['volumeinput', 'microphone', 'mic', 'input']);
-  if (!volCandidate) volCandidate = findByName(qs, ['volume', 'audio', 'sound']);
-  if (!btCandidate)  btCandidate  = findByName(qs, ['bluetooth', 'bt']);
-  if (!netCandidate) netCandidate = findByName(qs, ['network', 'net', 'wifi', 'wireless']);
-  if (!powCandidate) powCandidate = findByName(qs, ['power', 'system', 'battery']);
-
-  replaceIndicator(ps, 'microphone', micCandidate);
-  replaceIndicator(ps, 'volume',     volCandidate);
-  replaceIndicator(ps, 'bluetooth',  btCandidate);
-  replaceIndicator(ps, 'network',    netCandidate);
-  replaceIndicator(ps, 'power',      powCandidate);
-}
-
-function refreshAggIndicators(ps) {
-  const agg = ps.menu;
-
-  let volCandidate = agg._volume    || agg._volumeItem    || null;
-  let btCandidate  = agg._bluetooth || agg._bluetoothItem || null;
-  let netCandidate = agg._network   || agg._networkItem   || null;
-  let powCandidate = agg._power     || agg._powerItem     || null;
-
-  const findByName = (names) => {
-    const keys = Object.keys(agg || {});
-    const lowerNames = names.map(n => String(n).toLowerCase());
-    for (const k of keys) {
-      const kl = k.toLowerCase();
-      if (lowerNames.some(n => kl.includes(n))) {
-        const val = agg[k];
-        if (val && (typeof val.hide === 'function' || (val.actor && typeof val.actor.hide === 'function')))
-          return val;
-      }
-    }
-    return null;
-  };
-
-  // Note: microphone indicator is absent in GNOME 40–42 Aggregate Menu
-  const micCandidate = findByName(['volumeinput', 'microphone', 'mic', 'input']);
-  if (!volCandidate) volCandidate = findByName(['volume', 'audio', 'sound']);
-  if (!btCandidate)  btCandidate  = findByName(['bluetooth', 'bt']);
-  if (!netCandidate) netCandidate = findByName(['network', 'net', 'wifi', 'wireless']);
-  if (!powCandidate) powCandidate = findByName(['power', 'battery']);
-
-  replaceIndicator(ps, 'microphone', micCandidate);
-  replaceIndicator(ps, 'volume',     volCandidate);
-  replaceIndicator(ps, 'bluetooth',  btCandidate);
-  replaceIndicator(ps, 'network',    netCandidate);
-  replaceIndicator(ps, 'power',      powCandidate);
+function refreshIndicators(ps) {
+  const menu = ps.menu;
+  for (const row of INDICATOR_ROWS) {
+    const field = ps.isQs ? row.qs : row.agg;
+    const candidate = field ? menu[field] || null : null;
+    replaceIndicator(ps, row.kind, candidate);
+  }
 }
 
 function replaceIndicator(ps, kind, newIndicator) {
@@ -353,16 +305,16 @@ function detachRebuildWatch(ps) {
 
 function reapplyAll(ps) {
   refreshIndicatorsForPanel(ps);
-  for (const kind of KINDS) {
-    applyHide(ps, kind, settings && settings.get_boolean(SETTING_KEYS[kind]));
+  for (const row of INDICATOR_ROWS) {
+    applyHide(ps, row.kind, settings && settings.get_boolean(row.key));
   }
 }
 
 function updateAll() {
   for (const ps of panelStates) {
     refreshIndicatorsForPanel(ps);
-    for (const kind of KINDS) {
-      applyHide(ps, kind, settings && settings.get_boolean(SETTING_KEYS[kind]));
+    for (const row of INDICATOR_ROWS) {
+      applyHide(ps, row.kind, settings && settings.get_boolean(row.key));
     }
   }
 }

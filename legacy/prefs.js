@@ -8,8 +8,29 @@ const ExtensionUtils = imports.misc.extensionUtils;
 const Config = imports.misc.config;
 
 // GNOME Shell version check
-const SHELL_MAJOR = parseInt((Config.PACKAGE_VERSION || '0').split('.')[0]);
+const SHELL_MAJOR = parseInt((Config.PACKAGE_VERSION || '0').split('.')[0], 10);
 const Adw = SHELL_MAJOR >= 42 ? imports.gi.Adw : null;
+
+const ROW_MAJOR = parseInt((Config.PACKAGE_VERSION || '').split('.')[0], 10);
+const shellVersionKnown = Number.isFinite(ROW_MAJOR) && ROW_MAJOR > 0;
+
+const INDICATOR_ROWS = [
+  { key: 'hide-volume', title: 'Hide volume', subtitle: 'Hide the volume indicator.', since: 40 },
+  { key: 'hide-microphone', title: 'Hide microphone', subtitle: 'Hide the microphone indicator.', since: 40 },
+  { key: 'hide-location', title: 'Hide location', subtitle: 'Hide the location indicator.', since: 40 },
+  { key: 'hide-remote-access', title: 'Hide screen sharing', subtitle: 'Hide the screen sharing indicator.', since: 40 },
+  { key: 'hide-network', title: 'Hide network', subtitle: 'Hide the network indicator.', since: 40 },
+  { key: 'hide-bluetooth', title: 'Hide Bluetooth', subtitle: 'Hide the Bluetooth indicator.', since: 40 },
+  { key: 'hide-rfkill', title: 'Hide airplane mode', subtitle: 'Hide the airplane mode indicator.', since: 40 },
+  { key: 'hide-thunderbolt', title: 'Hide Thunderbolt', subtitle: 'Hide the Thunderbolt indicator.', since: 40 },
+  { key: 'hide-brightness', title: 'Hide brightness', subtitle: 'Hide the brightness indicator.', since: 40 },
+  { key: 'hide-night-light', title: 'Hide night light', subtitle: 'Hide the night light indicator.', since: 40 },
+  { key: 'hide-dark-mode', title: 'Hide dark mode', subtitle: 'Hide the dark mode indicator.', since: 43 },
+  { key: 'hide-auto-rotate', title: 'Hide auto rotate', subtitle: 'Hide the auto rotate indicator.', since: 43 },
+  { key: 'hide-power', title: 'Hide power', subtitle: 'Hide the power indicator.', since: 40 },
+  { key: 'hide-power-profiles', title: 'Hide power profiles', subtitle: 'Hide the power profiles indicator.', since: 41 },
+  { key: 'hide-background-apps', title: 'Hide background apps', subtitle: 'Hide the background apps indicator.', since: 44 },
+];
 
 let _ = (s) => s;
 
@@ -78,25 +99,13 @@ function buildPrefsWidget() {
 
   const { page, group } = _createPreferencesContainers();
 
-  const rows = [
-    _createSwitchRow(_('Hide microphone'), _('Hide the microphone indicator.')),
-    _createSwitchRow(_('Hide volume'), _('Hide the volume indicator.')),
-    _createSwitchRow(_('Hide Bluetooth'), _('Hide the Bluetooth indicator.')),
-    _createSwitchRow(_('Hide network'), _('Hide the network indicator.')),
-    _createSwitchRow(_('Hide power'), _('Hide the power indicator.')),
-  ];
+  for (const indicatorRow of INDICATOR_ROWS) {
+    if (shellVersionKnown && indicatorRow.since > ROW_MAJOR) continue;
 
-  for (const { row } of rows) {
+    const { row, toggle } = _createSwitchRow(_(indicatorRow.title), _(indicatorRow.subtitle));
     group.add(row);
+    settings.bind(indicatorRow.key, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
   }
-
-  const [mic, vol, bt, net, pow] = rows.map(r => r.toggle);
-
-  settings.bind('hide-microphone', mic, 'active', Gio.SettingsBindFlags.DEFAULT);
-  settings.bind('hide-volume', vol, 'active', Gio.SettingsBindFlags.DEFAULT);
-  settings.bind('hide-bluetooth', bt, 'active', Gio.SettingsBindFlags.DEFAULT);
-  settings.bind('hide-network', net, 'active', Gio.SettingsBindFlags.DEFAULT);
-  settings.bind('hide-power', pow, 'active', Gio.SettingsBindFlags.DEFAULT);
 
   return page;
 }
