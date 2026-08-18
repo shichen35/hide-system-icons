@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Toggles for 12 more Quick Settings indicators: camera, location, screen sharing, airplane mode, Thunderbolt, brightness, keyboard backlight, night light, dark mode, auto rotate, Do Not Disturb (GNOME 49+), and background apps.
 - Preferences are now grouped by category (Sound, Privacy, Connectivity, Display, Power, Status).
 
+### Fixed
+
+- The "Hide microphone" toggle had no effect on GNOME 40–44; it now works. Before GNOME 45 split the volume indicator in two, the microphone icon lived inside the combined `_volume` indicator rather than as a field of its own.
+
 ## [0.0.5] - 2026-04-10
 
 ### Highlights

@@ -60,8 +60,18 @@ function isVisible(target) {
   return target.actor && typeof target.actor.visible === 'boolean' ? target.actor.visible : false;
 }
 
+function resolveField(menu, path) {
+  if (!path) return null;
+  let obj = menu;
+  for (const part of path.split('.')) {
+    if (!obj) return null;
+    obj = obj[part];
+  }
+  return obj || null;
+}
+
 const INDICATOR_ROWS = [
-  { kind: 'microphone',     key: 'hide-microphone',       agg: null,             qs: '_volumeInput' },
+  { kind: 'microphone',     key: 'hide-microphone',       agg: '_volume._inputIndicator', qs: '_volume._inputIndicator' },
   { kind: 'volume',         key: 'hide-volume',           agg: '_volume',        qs: '_volume' },
   { kind: 'bluetooth',      key: 'hide-bluetooth',        agg: '_bluetooth',     qs: '_bluetooth' },
   { kind: 'network',        key: 'hide-network',          agg: '_network',       qs: '_network' },
@@ -240,9 +250,8 @@ function scheduleApply() {
     for (const ps of panelStates) refreshIndicatorsForPanel(ps);
 
     // Only require indicators that are guaranteed present on all supported
-    // versions. Microphone may be absent on GNOME 40-42 aggregate menu;
-    // bluetooth may be absent on systems without hardware; network may be
-    // absent on shells built without NetworkManager.
+    // versions. Bluetooth may be absent on systems without hardware; network
+    // may be absent on shells built without NetworkManager.
     const allReady = panelStates.length > 0 &&
       panelStates.every(ps => ps.indicators.volume && ps.indicators.power);
 
@@ -275,7 +284,7 @@ function refreshIndicators(ps) {
   const menu = ps.menu;
   for (const row of INDICATOR_ROWS) {
     const field = ps.isQs ? row.qs : row.agg;
-    const candidate = field ? menu[field] || null : null;
+    const candidate = resolveField(menu, field);
     replaceIndicator(ps, row.kind, candidate);
   }
 }
