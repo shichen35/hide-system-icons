@@ -25,6 +25,6 @@
   },
   "dependencies": {
     "@girs/gjs": "^4.0.0-beta.34",
-    "@girs/gnome-shell": "^48.0.4"
+    "@girs/gnome-shell": "^50.0.4"
   }
 }
