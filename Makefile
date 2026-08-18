@@ -15,7 +15,7 @@ all: pack
 node_modules: package.json
 	npm install
 
-dist/extension.js dist/prefs.js: node_modules
+dist/extension.js dist/prefs.js: node_modules $(wildcard *.ts)
 	node_modules/typescript/bin/tsc
 
 $(SCHEMAS): schemas/org.gnome.shell.extensions.$(NAME).gschema.xml

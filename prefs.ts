@@ -1,6 +1,8 @@
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import * as Config from 'resource:///org/gnome/Shell/Extensions/js/misc/config.js';
+import { GROUPS, INDICATORS } from './indicators.js';
 
 export default class HideSystemIconsPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {
@@ -11,57 +13,28 @@ export default class HideSystemIconsPreferences extends ExtensionPreferences {
       iconName: 'dialog-information-symbolic',
     });
 
-    // System icons toggles
-    const iconsGroup = new Adw.PreferencesGroup({
-      title: _('Quick Settings icons'),
-      description: _('Hide icons in the Quick Settings panel.'),
-    });
-    page.add(iconsGroup);
+    const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0], 10);
 
-    const hideMicrophone = new Adw.SwitchRow({
-      title: _('Hide microphone'),
-      subtitle: _('Hide the microphone indicator.'),
-    });
-    iconsGroup.add(hideMicrophone);
+    for (const group of GROUPS) {
+      const rows = INDICATORS.filter(row => row.group === group.id && !(row.since > shellVersion));
+      if (rows.length === 0) continue;
 
-    const hideVolume = new Adw.SwitchRow({
-      title: _('Hide volume'),
-      subtitle: _('Hide the volume indicator.'),
-    });
-    iconsGroup.add(hideVolume);
+      const groupWidget = new Adw.PreferencesGroup({
+        title: _(group.title),
+      });
+      page.add(groupWidget);
 
-    const hideBluetooth = new Adw.SwitchRow({
-      title: _('Hide Bluetooth'),
-      subtitle: _('Hide the Bluetooth indicator.'),
-    });
-    iconsGroup.add(hideBluetooth);
-
-    const hideNetwork = new Adw.SwitchRow({
-      title: _('Hide network'),
-      subtitle: _('Hide the network indicator.'),
-    });
-    iconsGroup.add(hideNetwork);
-
-    const hidePowerProfiles = new Adw.SwitchRow({
-      title: _('Hide power profiles'),
-      subtitle: _('Hide the power profiles indicator.'),
-    });
-    iconsGroup.add(hidePowerProfiles);
-
-    const hidePower = new Adw.SwitchRow({
-      title: _('Hide power'),
-      subtitle: _('Hide the power indicator.'),
-    });
-    iconsGroup.add(hidePower);
+      for (const row of rows) {
+        const switchRow = new Adw.SwitchRow({
+          title: _(row.title),
+          subtitle: _(row.subtitle),
+        });
+        groupWidget.add(switchRow);
+        settings.bind(row.settingKey, switchRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+      }
+    }
 
     window.add(page);
-
-    settings.bind('hide-microphone', hideMicrophone, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-volume', hideVolume, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-bluetooth', hideBluetooth, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-network', hideNetwork, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-power-profiles', hidePowerProfiles, 'active', Gio.SettingsBindFlags.DEFAULT);
-    settings.bind('hide-power', hidePower, 'active', Gio.SettingsBindFlags.DEFAULT);
 
     return Promise.resolve();
   }
