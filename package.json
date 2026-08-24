@@ -19,8 +19,8 @@
     "test": "tsc -p tsconfig.test.json && node --test 'dist-test/test/*.test.js'"
   },
   "devDependencies": {
-    "eslint": "^10.8.1",
-    "eslint-plugin-jsdoc": "^64.1.0",
+    "eslint": "^10.9.0",
+    "eslint-plugin-jsdoc": "^64.2.1",
     "typescript": "^7.0.2"
   },
   "dependencies": {
