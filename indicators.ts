@@ -38,7 +38,7 @@ export type QSField =
   | '_doNotDisturb'
   | '_backgroundApps';
 
-export type QSGroup = 'sound' | 'privacy' | 'connectivity' | 'display' | 'power' | 'status';
+export type QSGroup = 'hardware' | 'appearance' | 'privacy';
 
 export interface IndicatorRow {
   group: QSGroup;
@@ -49,22 +49,21 @@ export interface IndicatorRow {
   subtitle: string;
   since: number;
   required: boolean;
+  privacySensitive?: boolean;
+  privacyWarning?: string;
 }
 
 const N_ = (s: string): string => s;
 
 export const GROUPS: readonly { id: QSGroup; title: string }[] = [
-  { id: 'sound', title: N_('Sound') },
-  { id: 'privacy', title: N_('Privacy') },
-  { id: 'connectivity', title: N_('Connectivity') },
-  { id: 'display', title: N_('Display') },
-  { id: 'power', title: N_('Power') },
-  { id: 'status', title: N_('Status') },
+  { id: 'hardware', title: N_('Hardware') },
+  { id: 'appearance', title: N_('Display & Appearance') },
+  { id: 'privacy', title: N_('Privacy & System') },
 ];
 
 export const INDICATORS: readonly IndicatorRow[] = [
   {
-    group: 'sound',
+    group: 'hardware',
     kind: 'volume',
     settingKey: 'hide-volume',
     qsField: '_volumeOutput',
@@ -74,12 +73,107 @@ export const INDICATORS: readonly IndicatorRow[] = [
     required: true,
   },
   {
-    group: 'sound',
+    group: 'hardware',
     kind: 'microphone',
     settingKey: 'hide-microphone',
     qsField: '_volumeInput',
     title: N_('Hide microphone'),
     subtitle: N_('Hide the microphone indicator.'),
+    since: 45,
+    required: false,
+    privacySensitive: true,
+    privacyWarning: N_(
+      'The microphone indicator is your only on-screen sign that an app is recording. ' +
+        'If you hide it, recording can start with no visible warning.',
+    ),
+  },
+  {
+    group: 'hardware',
+    kind: 'network',
+    settingKey: 'hide-network',
+    qsField: '_network',
+    title: N_('Hide network'),
+    subtitle: N_('Hide the network indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'hardware',
+    kind: 'bluetooth',
+    settingKey: 'hide-bluetooth',
+    qsField: '_bluetooth',
+    title: N_('Hide Bluetooth'),
+    subtitle: N_('Hide the Bluetooth indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'hardware',
+    kind: 'rfkill',
+    settingKey: 'hide-rfkill',
+    qsField: '_rfkill',
+    title: N_('Hide airplane mode'),
+    subtitle: N_('Hide the airplane mode indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'hardware',
+    kind: 'thunderbolt',
+    settingKey: 'hide-thunderbolt',
+    qsField: '_thunderbolt',
+    title: N_('Hide Thunderbolt'),
+    subtitle: N_('Hide the Thunderbolt indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'appearance',
+    kind: 'brightness',
+    settingKey: 'hide-brightness',
+    qsField: '_brightness',
+    title: N_('Hide brightness'),
+    subtitle: N_('Hide the brightness indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'appearance',
+    kind: 'backlight',
+    settingKey: 'hide-backlight',
+    qsField: '_backlight',
+    title: N_('Hide keyboard backlight'),
+    subtitle: N_('Hide the keyboard backlight indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'appearance',
+    kind: 'nightLight',
+    settingKey: 'hide-night-light',
+    qsField: '_nightLight',
+    title: N_('Hide night light'),
+    subtitle: N_('Hide the night light indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'appearance',
+    kind: 'darkMode',
+    settingKey: 'hide-dark-mode',
+    qsField: '_darkMode',
+    title: N_('Hide dark mode'),
+    subtitle: N_('Hide the dark mode indicator.'),
+    since: 45,
+    required: false,
+  },
+  {
+    group: 'appearance',
+    kind: 'autoRotate',
+    settingKey: 'hide-auto-rotate',
+    qsField: '_autoRotate',
+    title: N_('Hide auto rotate'),
+    subtitle: N_('Hide the auto rotate indicator.'),
     since: 45,
     required: false,
   },
@@ -92,6 +186,11 @@ export const INDICATORS: readonly IndicatorRow[] = [
     subtitle: N_('Hide the camera indicator.'),
     since: 45,
     required: false,
+    privacySensitive: true,
+    privacyWarning: N_(
+      'The camera indicator is your only on-screen sign that an app is using your camera. ' +
+        'If you hide it, the camera can turn on with no visible warning.',
+    ),
   },
   {
     group: 'privacy',
@@ -102,6 +201,11 @@ export const INDICATORS: readonly IndicatorRow[] = [
     subtitle: N_('Hide the location indicator.'),
     since: 45,
     required: false,
+    privacySensitive: true,
+    privacyWarning: N_(
+      'The location indicator is your only on-screen sign that an app is reading your location. ' +
+        'If you hide it, your location can be accessed with no visible warning.',
+    ),
   },
   {
     group: 'privacy',
@@ -112,99 +216,14 @@ export const INDICATORS: readonly IndicatorRow[] = [
     subtitle: N_('Hide the screen sharing indicator.'),
     since: 45,
     required: false,
+    privacySensitive: true,
+    privacyWarning: N_(
+      'The screen sharing indicator is your only on-screen sign that your screen is being shared or recorded. ' +
+        'If you hide it, sharing can continue with no visible warning.',
+    ),
   },
   {
-    group: 'connectivity',
-    kind: 'network',
-    settingKey: 'hide-network',
-    qsField: '_network',
-    title: N_('Hide network'),
-    subtitle: N_('Hide the network indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'connectivity',
-    kind: 'bluetooth',
-    settingKey: 'hide-bluetooth',
-    qsField: '_bluetooth',
-    title: N_('Hide Bluetooth'),
-    subtitle: N_('Hide the Bluetooth indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'connectivity',
-    kind: 'rfkill',
-    settingKey: 'hide-rfkill',
-    qsField: '_rfkill',
-    title: N_('Hide airplane mode'),
-    subtitle: N_('Hide the airplane mode indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'connectivity',
-    kind: 'thunderbolt',
-    settingKey: 'hide-thunderbolt',
-    qsField: '_thunderbolt',
-    title: N_('Hide Thunderbolt'),
-    subtitle: N_('Hide the Thunderbolt indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'display',
-    kind: 'brightness',
-    settingKey: 'hide-brightness',
-    qsField: '_brightness',
-    title: N_('Hide brightness'),
-    subtitle: N_('Hide the brightness indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'display',
-    kind: 'backlight',
-    settingKey: 'hide-backlight',
-    qsField: '_backlight',
-    title: N_('Hide keyboard backlight'),
-    subtitle: N_('Hide the keyboard backlight indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'display',
-    kind: 'nightLight',
-    settingKey: 'hide-night-light',
-    qsField: '_nightLight',
-    title: N_('Hide night light'),
-    subtitle: N_('Hide the night light indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'display',
-    kind: 'darkMode',
-    settingKey: 'hide-dark-mode',
-    qsField: '_darkMode',
-    title: N_('Hide dark mode'),
-    subtitle: N_('Hide the dark mode indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'display',
-    kind: 'autoRotate',
-    settingKey: 'hide-auto-rotate',
-    qsField: '_autoRotate',
-    title: N_('Hide auto rotate'),
-    subtitle: N_('Hide the auto rotate indicator.'),
-    since: 45,
-    required: false,
-  },
-  {
-    group: 'power',
+    group: 'privacy',
     kind: 'power',
     settingKey: 'hide-power',
     qsField: '_system',
@@ -214,7 +233,7 @@ export const INDICATORS: readonly IndicatorRow[] = [
     required: true,
   },
   {
-    group: 'power',
+    group: 'privacy',
     kind: 'powerProfiles',
     settingKey: 'hide-power-profiles',
     qsField: '_powerProfiles',
@@ -224,7 +243,7 @@ export const INDICATORS: readonly IndicatorRow[] = [
     required: false,
   },
   {
-    group: 'status',
+    group: 'privacy',
     kind: 'doNotDisturb',
     settingKey: 'hide-do-not-disturb',
     qsField: '_doNotDisturb',
@@ -234,7 +253,7 @@ export const INDICATORS: readonly IndicatorRow[] = [
     required: false,
   },
   {
-    group: 'status',
+    group: 'privacy',
     kind: 'backgroundApps',
     settingKey: 'hide-background-apps',
     qsField: '_backgroundApps',
@@ -244,3 +263,6 @@ export const INDICATORS: readonly IndicatorRow[] = [
     required: false,
   },
 ];
+
+export const availableIndicators = (shellVersion: number): readonly IndicatorRow[] =>
+  INDICATORS.filter(row => !(row.since > shellVersion));
