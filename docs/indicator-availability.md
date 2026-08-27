@@ -189,3 +189,38 @@ the only one that reaches its icon one level deeper, inside the combined
 machinery the old extension loader provides, and cannot be imported under
 plain Node. None of the legacy tree is covered by the test suite, and none of
 it can be.
+
+## Container rebuild signals
+
+The panel's indicator container (`_indicators`, an `StBoxLayout`) is watched for
+rebuilds. **The signal names differ by Shell version**, read by
+`GObject.signal_lookup()` on a running shell rather than assumed:
+
+| Shell | `child-added` / `child-removed` | `actor-added` / `actor-removed` |
+|---|:-:|:-:|
+| 44 | absent | present (id 75/76) |
+| 45 | absent | present (id 91/92) |
+| 50 | present | present |
+
+43 was not measured; it shares GNOME 44's Quick Settings container and is
+assumed to match. The 46–49 crossover point was never pinned down and does not
+need to be: `attachRebuildWatch()` in both trees tries `child-added` first and
+falls back to `actor-added`, so the boundary is irrelevant.
+
+Assuming `child-added` existed everywhere is what broke hiding outright on
+GNOME 43–45. The connect threw, the exception escaped before the code that
+applies the hide state ever ran, and the extension silently did nothing at all.
+That is why the watch is now best-effort in both trees: it exists only to
+re-apply hiding after a rebuild, so it must never be able to prevent the
+initial hide. Verified on real VMs — before the fix GNOME 44 and 45 hid nothing
+with the flags set; after it, they hide correctly.
+
+## Quick Settings fields on GNOME 44 (measured)
+
+Probed on a real Shell 44.0 session. Every `qs` field the legacy table expects
+resolves, and the two 45-only fields are correctly absent:
+
+`_volume` `_network` `_system` `_bluetooth` `_darkMode` `_autoRotate`
+`_backgroundApps` `_powerProfiles` `_location` `_remoteAccess` `_rfkill`
+`_thunderbolt` `_brightness` `_nightLight` — all present.
+`_volumeInput` / `_volumeOutput` — absent, as the table says (45+).

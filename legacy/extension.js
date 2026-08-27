@@ -7,7 +7,7 @@
 
 /* globals imports */
 
-const { Gio, GLib } = imports.gi;
+const { Gio, GLib, GObject } = imports.gi;
 const Main = imports.ui.main;
 const ExtensionUtils = imports.misc.extensionUtils;
 
@@ -269,7 +269,6 @@ function scheduleApply() {
 function refreshIndicatorsForPanel(ps) {
   refreshIndicators(ps);
   if (ps.isQs) {
-    // QS containers emit child-added/child-removed on panel rebuilds
     const newContainer = ps.menu._indicators || ps.menu._grid || ps.menu._box || null;
     if (newContainer !== ps.container) {
       detachRebuildWatch(ps);
@@ -299,10 +298,17 @@ function replaceIndicator(ps, kind, newIndicator) {
 
 function attachRebuildWatch(ps) {
   if (!ps.container) return;
-  if (!ps.addedHandler)
-    ps.addedHandler = ps.container.connect('child-added', () => reapplyAll(ps));
-  if (!ps.removedHandler)
-    ps.removedHandler = ps.container.connect('child-removed', () => reapplyAll(ps));
+  if (ps.addedHandler || ps.removedHandler) return;
+
+  const gtype = ps.container.constructor && ps.container.constructor.$gtype;
+  if (!gtype) return;
+
+  const pairs = [['child-added', 'child-removed'], ['actor-added', 'actor-removed']];
+  const pair = pairs.find(([added]) => GObject.signal_lookup(added, gtype) !== 0);
+  if (!pair) return;
+
+  ps.addedHandler = ps.container.connect(pair[0], () => reapplyAll(ps));
+  ps.removedHandler = ps.container.connect(pair[1], () => reapplyAll(ps));
 }
 
 function detachRebuildWatch(ps) {

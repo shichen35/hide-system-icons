@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GROUPS, INDICATORS, IndicatorKind } from '../indicators.js';
+import { GROUPS, INDICATORS, IndicatorKind, availableIndicators } from '../indicators.js';
 
 const ALL_KINDS: IndicatorKind[] = [
   'microphone',
@@ -84,5 +84,42 @@ describe('INDICATORS', () => {
       }
     }
     assert.deepEqual(appearanceOrder, GROUPS.map(group => group.id));
+  });
+});
+
+describe('availableIndicators', () => {
+  test('excludes rows newer than the given Shell version', () => {
+    const rows = availableIndicators(45);
+    assert.ok(!rows.some(row => row.kind === 'doNotDisturb'));
+    assert.equal(rows.length, INDICATORS.length - 1);
+  });
+
+  test('includes every row once the Shell version reaches its since', () => {
+    const rows = availableIndicators(49);
+    assert.equal(rows.length, INDICATORS.length);
+  });
+
+  test('fails open (shows every row) when the Shell version is NaN', () => {
+    const rows = availableIndicators(NaN);
+    assert.equal(rows.length, INDICATORS.length);
+  });
+});
+
+describe('privacySensitive rows', () => {
+  test('privacySensitive is true for exactly camera, microphone, location and remoteAccess', () => {
+    const sensitiveKinds = INDICATORS.filter(row => row.privacySensitive).map(row => row.kind).sort();
+    assert.deepEqual(sensitiveKinds, ['camera', 'location', 'microphone', 'remoteAccess'].sort());
+  });
+
+  test('every privacySensitive row carries a non-empty privacyWarning', () => {
+    for (const row of INDICATORS) {
+      if (row.privacySensitive) assert.ok(row.privacyWarning && row.privacyWarning.length > 0);
+    }
+  });
+
+  test('no non-sensitive row carries a privacyWarning', () => {
+    for (const row of INDICATORS) {
+      if (!row.privacySensitive) assert.equal(row.privacyWarning, undefined);
+    }
   });
 });

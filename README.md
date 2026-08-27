@@ -15,24 +15,24 @@ Install from GNOME Extensions: [Hide System Icons](https://extensions.gnome.org/
 
 ## Features
 
-- Sound: hide volume, hide microphone
-- Privacy: hide camera, hide location, hide screen sharing
-- Connectivity: hide network, hide Bluetooth, hide airplane mode, hide Thunderbolt
-- Display: hide brightness, hide keyboard backlight, hide night light, hide dark mode, hide auto rotate
-- Power: hide power, hide power profiles
-- Status: hide Do Not Disturb (GNOME 49+), hide background apps
+- Hardware: hide volume, hide microphone, hide network, hide Bluetooth, hide airplane mode, hide Thunderbolt
+- Display & Appearance: hide brightness, hide keyboard backlight, hide night light, hide dark mode, hide auto rotate
+- Privacy & System: hide camera, hide location, hide screen sharing, hide power, hide power profiles, hide Do Not Disturb (GNOME 49+), hide background apps
 - Changes apply immediately and persist across restarts
 
 ## Settings
 
-Preferences: Extensions app → this extension → Preferences. Toggles are grouped to match the Quick Settings panel:
+Preferences: Extensions app → this extension → Preferences. Toggles are grouped:
 
-- Sound: hide volume, hide microphone
-- Privacy: hide camera, hide location, hide screen sharing
-- Connectivity: hide network, hide Bluetooth, hide airplane mode, hide Thunderbolt
-- Display: hide brightness, hide keyboard backlight, hide night light, hide dark mode, hide auto rotate
-- Power: hide power, hide power profiles
-- Status: hide Do Not Disturb (GNOME 49+), hide background apps
+- Hardware: hide volume, hide microphone, hide network, hide Bluetooth, hide airplane mode, hide Thunderbolt
+- Display & Appearance: hide brightness, hide keyboard backlight, hide night light, hide dark mode, hide auto rotate
+- Privacy & System: hide camera, hide location, hide screen sharing, hide power, hide power profiles, hide Do Not Disturb (GNOME 49+), hide background apps
+
+"Hide all" / "Show all" at the top of the page apply to every toggle at once.
+Hiding the camera, microphone, location or screen sharing indicator asks for
+confirmation first (those icons are your only on-screen sign the sensor is in
+use) — "Hide all" offers a "Keep privacy icons" option for exactly this
+reason.
 
 GSettings (advanced):
 

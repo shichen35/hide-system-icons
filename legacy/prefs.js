@@ -16,9 +16,36 @@ const shellVersionKnown = Number.isFinite(ROW_MAJOR) && ROW_MAJOR > 0;
 
 const INDICATOR_ROWS = [
   { key: 'hide-volume', title: 'Hide volume', subtitle: 'Hide the volume indicator.', since: 40 },
-  { key: 'hide-microphone', title: 'Hide microphone', subtitle: 'Hide the microphone indicator.', since: 40 },
-  { key: 'hide-location', title: 'Hide location', subtitle: 'Hide the location indicator.', since: 40 },
-  { key: 'hide-remote-access', title: 'Hide screen sharing', subtitle: 'Hide the screen sharing indicator.', since: 40 },
+  {
+    key: 'hide-microphone',
+    title: 'Hide microphone',
+    subtitle: 'Hide the microphone indicator.',
+    since: 40,
+    privacySensitive: true,
+    privacyWarning:
+      'The microphone indicator is your only on-screen sign that an app is recording. ' +
+      'If you hide it, recording can start with no visible warning.',
+  },
+  {
+    key: 'hide-location',
+    title: 'Hide location',
+    subtitle: 'Hide the location indicator.',
+    since: 40,
+    privacySensitive: true,
+    privacyWarning:
+      'The location indicator is your only on-screen sign that an app is reading your location. ' +
+      'If you hide it, your location can be accessed with no visible warning.',
+  },
+  {
+    key: 'hide-remote-access',
+    title: 'Hide screen sharing',
+    subtitle: 'Hide the screen sharing indicator.',
+    since: 40,
+    privacySensitive: true,
+    privacyWarning:
+      'The screen sharing indicator is your only on-screen sign that your screen is being shared or recorded. ' +
+      'If you hide it, sharing can continue with no visible warning.',
+  },
   { key: 'hide-network', title: 'Hide network', subtitle: 'Hide the network indicator.', since: 40 },
   { key: 'hide-bluetooth', title: 'Hide Bluetooth', subtitle: 'Hide the Bluetooth indicator.', since: 40 },
   { key: 'hide-rfkill', title: 'Hide airplane mode', subtitle: 'Hide the airplane mode indicator.', since: 40 },
@@ -94,6 +121,64 @@ function _createSwitchRow(label, subtitle) {
   return { row, toggle };
 }
 
+function _confirmHidePrivacyRow(toggle, indicatorRow, onAnswer) {
+  const root = typeof toggle.get_root === 'function' ? toggle.get_root() : null;
+
+  const dialog = new Gtk.MessageDialog({
+    transient_for: root instanceof Gtk.Window ? root : null,
+    modal: true,
+    message_type: Gtk.MessageType.WARNING,
+    buttons: Gtk.ButtonsType.NONE,
+    text: _(indicatorRow.title) + '?',
+    secondary_text: _(indicatorRow.privacyWarning || ''),
+  });
+
+  const CANCEL = 1;
+  const HIDE = 2;
+  dialog.add_button(_('Cancel'), CANCEL);
+  dialog.add_button(_('Hide anyway'), HIDE);
+  dialog.set_default_response(CANCEL);
+
+  const hideButton = dialog.get_widget_for_response(HIDE);
+  if (hideButton && hideButton.add_css_class) hideButton.add_css_class('destructive-action');
+
+  dialog.connect('response', (dlg, response) => {
+    dlg.destroy();
+    onAnswer(response === HIDE);
+  });
+  dialog.present();
+}
+
+function _bindPrivacyRow(settings, toggle, indicatorRow) {
+  let syncing = false;
+  const apply = (hidden) => {
+    syncing = true;
+    toggle.set_active(hidden);
+    toggle.set_state(hidden);
+    syncing = false;
+  };
+
+  apply(settings.get_boolean(indicatorRow.key));
+
+  toggle.connect('state-set', (widget, state) => {
+    if (syncing) return true;
+    if (!state) {
+      settings.set_boolean(indicatorRow.key, false);
+      return false;
+    }
+
+    _confirmHidePrivacyRow(toggle, indicatorRow, (confirmed) => {
+      if (confirmed) settings.set_boolean(indicatorRow.key, true);
+      apply(confirmed);
+    });
+    return true;
+  });
+
+  settings.connect('changed::' + indicatorRow.key, () => {
+    apply(settings.get_boolean(indicatorRow.key));
+  });
+}
+
 function buildPrefsWidget() {
   const settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.hide-system-icons');
 
@@ -104,7 +189,12 @@ function buildPrefsWidget() {
 
     const { row, toggle } = _createSwitchRow(_(indicatorRow.title), _(indicatorRow.subtitle));
     group.add(row);
-    settings.bind(indicatorRow.key, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+
+    if (indicatorRow.privacySensitive) {
+      _bindPrivacyRow(settings, toggle, indicatorRow);
+    } else {
+      settings.bind(indicatorRow.key, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+    }
   }
 
   return page;

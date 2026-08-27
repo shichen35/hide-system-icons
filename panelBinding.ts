@@ -5,14 +5,23 @@ export interface SettingsReader {
   get_boolean(key: string): boolean;
 }
 
+export type SignalProbe = (target: any, signal: string) => boolean;
+
+const REBUILD_SIGNALS: readonly (readonly [string, string])[] = [
+  ['child-added', 'child-removed'],
+  ['actor-added', 'actor-removed'],
+];
+
 export class PanelBinding {
   private readonly panel: QuickSettingsPanel;
+  private readonly hasSignal: SignalProbe;
   private readonly indicators: Record<IndicatorKind, HiddenIndicator | null>;
   private container: any | null = null;
   private settings: SettingsReader | null = null;
 
-  constructor(panel: QuickSettingsPanel) {
+  constructor(panel: QuickSettingsPanel, hasSignal: SignalProbe) {
     this.panel = panel;
+    this.hasSignal = hasSignal;
     this.indicators = {} as Record<IndicatorKind, HiddenIndicator | null>;
     for (const row of INDICATORS) this.indicators[row.kind] = null;
   }
@@ -65,11 +74,12 @@ export class PanelBinding {
 
   private attachRebuildWatch(container: any): void {
     if (!container) return;
-    container.connectObject(
-      'child-added', () => this.reapply(),
-      'child-removed', () => this.reapply(),
-      this,
-    );
+
+    const pair = REBUILD_SIGNALS.find(([added]) => this.hasSignal(container, added));
+    if (!pair) return;
+
+    const reapply = (): void => this.reapply();
+    container.connectObject(pair[0], reapply, pair[1], reapply, this);
     this.container = container;
   }
 
