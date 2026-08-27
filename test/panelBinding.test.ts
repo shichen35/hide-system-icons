@@ -10,13 +10,16 @@ import { makePanel } from './fakes/panel.js';
 const volumeRow = INDICATORS.find(row => row.kind === 'volume')!;
 const powerRow = INDICATORS.find(row => row.kind === 'power')!;
 
+const hasSignal = (target: any, signal: string): boolean =>
+  !target?.supportedSignals || target.supportedSignals.includes(signal);
+
 describe('PanelBinding', () => {
   test('refresh() wraps a raw indicator present at a catalog field', () => {
     const panel = makePanel({
       [volumeRow.qsField]: new FakeHideable(true),
       [powerRow.qsField]: new FakeHideable(true),
     });
-    const binding = new PanelBinding(panel);
+    const binding = new PanelBinding(panel, hasSignal);
 
     assert.equal(binding.isReady(), false);
     binding.refresh();
@@ -27,7 +30,7 @@ describe('PanelBinding', () => {
     const volume = new FakeHideable(true);
     const power = new FakeHideable(true);
     const panel = makePanel({ [volumeRow.qsField]: volume, [powerRow.qsField]: power });
-    const binding = new PanelBinding(panel);
+    const binding = new PanelBinding(panel, hasSignal);
     const settings = new FakeSettingsReader({ [volumeRow.settingKey]: true });
 
     binding.sync(settings);
@@ -46,7 +49,7 @@ describe('PanelBinding', () => {
     const volumeB = new FakeHideable(true);
     const power = new FakeHideable(true);
     const panel = makePanel({ [volumeRow.qsField]: volumeA, [powerRow.qsField]: power });
-    const binding = new PanelBinding(panel);
+    const binding = new PanelBinding(panel, hasSignal);
     const settings = new FakeSettingsReader({ [volumeRow.settingKey]: true });
 
     binding.sync(settings);
@@ -64,7 +67,7 @@ describe('PanelBinding', () => {
     const containerA = new FakeContainer();
     const containerB = new FakeContainer();
     const panel = makePanel({ _indicators: containerA });
-    const binding = new PanelBinding(panel);
+    const binding = new PanelBinding(panel, hasSignal);
 
     binding.refresh();
     assert.equal(containerA.connectCallCount, 1);
@@ -80,19 +83,50 @@ describe('PanelBinding', () => {
     assert.equal(containerB.connectCallCount, 1);
   });
 
+  test('the rebuild watch falls back to actor-added on shells without child-added', () => {
+    const container = new FakeContainer();
+    container.supportedSignals = ['actor-added', 'actor-removed'];
+    const panel = makePanel({ _indicators: container });
+    const binding = new PanelBinding(panel, hasSignal);
+
+    binding.refresh();
+
+    const volume = new FakeHideable(true);
+    panel[INDICATORS.find(row => row.kind === 'volume')!.qsField] = volume;
+    binding.sync({ get_boolean: key => key === 'hide-volume' });
+    assert.equal(volume.visible, false);
+
+    volume.show();
+    container.emit('actor-added');
+    assert.equal(volume.visible, false);
+  });
+
+  test('a container with no usable rebuild signal still hides: the watch is best-effort', () => {
+    const container = new FakeContainer();
+    container.supportedSignals = [];
+    const panel = makePanel({ _indicators: container });
+    const volume = new FakeHideable(true);
+    panel[INDICATORS.find(row => row.kind === 'volume')!.qsField] = volume;
+    const binding = new PanelBinding(panel, hasSignal);
+
+    binding.sync({ get_boolean: key => key === 'hide-volume' });
+
+    assert.equal(volume.visible, false);
+  });
+
   test('isReady() is true only when every required catalog row is resolved', () => {
     const requiredFields = INDICATORS.filter(row => row.required).map(row => row.qsField);
     const optionalFields = INDICATORS.filter(row => !row.required).map(row => row.qsField);
 
     const readyPanel = makePanel();
     for (const field of requiredFields) readyPanel[field] = new FakeHideable(true);
-    const readyBinding = new PanelBinding(readyPanel);
+    const readyBinding = new PanelBinding(readyPanel, hasSignal);
     readyBinding.refresh();
     assert.equal(readyBinding.isReady(), true);
 
     const notReadyPanel = makePanel();
     for (const field of optionalFields) notReadyPanel[field] = new FakeHideable(true);
-    const notReadyBinding = new PanelBinding(notReadyPanel);
+    const notReadyBinding = new PanelBinding(notReadyPanel, hasSignal);
     notReadyBinding.refresh();
     assert.equal(notReadyBinding.isReady(), false);
   });
@@ -100,7 +134,7 @@ describe('PanelBinding', () => {
   test('matches() compares panel identity only', () => {
     const panelA = makePanel();
     const panelB = makePanel();
-    const binding = new PanelBinding(panelA);
+    const binding = new PanelBinding(panelA, hasSignal);
 
     assert.equal(binding.matches(panelA), true);
     assert.equal(binding.matches(panelB), false);
@@ -114,7 +148,7 @@ describe('PanelBinding', () => {
       raws.set(row.kind, fake);
       panel[row.qsField] = fake;
     }
-    const binding = new PanelBinding(panel);
+    const binding = new PanelBinding(panel, hasSignal);
 
     const values: Record<string, boolean> = {};
     INDICATORS.forEach((row, i) => { values[row.settingKey] = i % 2 === 0; });
@@ -137,7 +171,7 @@ describe('PanelBinding', () => {
       [volumeRow.qsField]: volume,
       [powerRow.qsField]: power,
     });
-    const binding = new PanelBinding(panel);
+    const binding = new PanelBinding(panel, hasSignal);
     const settings = new FakeSettingsReader({ [volumeRow.settingKey]: true });
 
     binding.sync(settings);

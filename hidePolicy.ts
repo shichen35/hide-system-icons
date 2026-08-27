@@ -9,6 +9,7 @@ export interface ShellPort {
   watchSettings(onChanged: () => void): void;
   watchPanels(onChanged: () => void): void;
   unwatch(): void;
+  hasSignal(target: object, signal: string): boolean;
 }
 
 export class HidePolicy {
@@ -60,7 +61,7 @@ export class HidePolicy {
     const allQs = this.port.panels();
     for (const qs of allQs) {
       if (this.bindings.some(binding => binding.matches(qs))) continue;
-      this.bindings.push(new PanelBinding(qs));
+      this.bindings.push(new PanelBinding(qs, (target, signal) => this.port.hasSignal(target, signal)));
     }
   }
 

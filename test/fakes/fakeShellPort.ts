@@ -23,6 +23,11 @@ export class FakeShellPort implements ShellPort {
     this.panelsList = panels;
   }
 
+  hasSignal(target: object, signal: string): boolean {
+    const declared = (target as { supportedSignals?: string[] })?.supportedSignals;
+    return !declared || declared.includes(signal);
+  }
+
   setPanels(panels: QuickSettingsPanel[]): void {
     this.panelsList = panels;
   }

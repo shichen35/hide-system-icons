@@ -1,4 +1,5 @@
 import GLib from "gi://GLib";
+import GObject from "gi://GObject";
 import Gio from "gi://Gio";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as Config from "resource:///org/gnome/shell/misc/config.js";
@@ -53,6 +54,12 @@ export class GnomeShellPort implements ShellPort {
       GLib.Source.remove(this.sourceId);
       this.sourceId = null;
     }
+  }
+
+  hasSignal(target: object, signal: string): boolean {
+    const gtype = (target as any)?.constructor?.$gtype;
+    if (!gtype) return false;
+    return GObject.signal_lookup(signal, gtype) !== 0;
   }
 
   watchSettings(onChanged: () => void): void {
