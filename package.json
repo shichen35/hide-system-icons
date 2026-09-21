@@ -24,7 +24,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@girs/gjs": "^5.0.0",
+    "@girs/gjs": "^5.2.0",
     "@girs/gnome-shell": "^50.0.4"
   }
 }
