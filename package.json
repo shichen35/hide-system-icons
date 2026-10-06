@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "eslint": "^10.11.0",
-    "eslint-plugin-jsdoc": "^64.5.4",
+    "eslint-plugin-jsdoc": "^65.0.1",
     "typescript": "^7.0.2"
   },
   "dependencies": {
