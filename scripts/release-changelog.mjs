@@ -7,14 +7,18 @@ const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const path = 'CHANGELOG.md';
 const changelog = readFileSync(path, 'utf8');
 
+// Git on Windows checks files out with CRLF line endings, so match either
+// ending and write new lines with whichever the file already uses.
 const heading = '## [Unreleased]';
-const start = changelog.indexOf(`${heading}\n`);
-if (start === -1) {
+const match = /^## \[Unreleased\](\r?\n)/m.exec(changelog);
+if (!match) {
   console.error(`${path}: no "${heading}" section to release`);
   process.exit(1);
 }
 
-const bodyStart = start + heading.length + 1;
+const start = match.index;
+const eol = match[1];
+const bodyStart = start + match[0].length;
 const next = changelog.indexOf('\n## [', bodyStart);
 const body = changelog.slice(bodyStart, next === -1 ? undefined : next);
 if (body.trim() === '') {
@@ -25,5 +29,5 @@ if (body.trim() === '') {
 const date = new Date().toISOString().slice(0, 10);
 writeFileSync(
   path,
-  changelog.slice(0, start) + `${heading}\n\n## [${version}] - ${date}\n` + changelog.slice(bodyStart),
+  changelog.slice(0, start) + `${heading}${eol}${eol}## [${version}] - ${date}${eol}` + changelog.slice(bodyStart),
 );
