@@ -1,0 +1,31 @@
+name: Feature request
+description: Ask for an icon to be hideable, or suggest another improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: What would you like?
+      description: If it's an icon you want to hide, describe it or attach a screenshot showing where it appears.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: What problem does this solve for you?
+
+  - type: input
+    id: gnome-version
+    attributes:
+      label: GNOME Shell version
+      description: Which GNOME Shell version you use. Some icons only exist on certain versions.
+      placeholder: e.g. 49
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: |
+        Some icons are deliberately not hideable, such as GNOME's "unsafe mode" warning. Privacy indicators (camera, microphone, location, screen sharing) can be hidden but ask for confirmation first.

@@ -81,6 +81,10 @@ make install-modern
 make install-legacy
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing and how to add a hideable icon.
+
 ## Releasing
 
 The project follows [Semantic Versioning](https://semver.org/), and `package.json` holds the version.

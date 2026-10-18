@@ -1,0 +1,82 @@
+name: Bug report
+description: An icon isn't hidden, comes back, or something else doesn't work.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Which icon or setting, what you expected, and what you saw instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: For example, "Turn on Hide microphone, lock the screen, unlock, the icon is back."
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gnome-version
+    attributes:
+      label: GNOME Shell version
+      description: Run `gnome-shell --version` if you're not sure.
+      options:
+        - "51"
+        - "50"
+        - "49"
+        - "48"
+        - "47"
+        - "46"
+        - "45"
+        - "44"
+        - "43"
+        - "42"
+        - "41"
+        - "40"
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      description: From the release zip name, the extensions.gnome.org page, or the version shown in the Extensions app.
+    validations:
+      required: true
+
+  - type: input
+    id: distro
+    attributes:
+      label: Distribution and session
+      placeholder: e.g. Fedora 43, Wayland
+    validations:
+      required: true
+
+  - type: textarea
+    id: other-extensions
+    attributes:
+      label: Other enabled extensions
+      description: Especially ones that change the top panel, such as Dash to Panel. `gnome-extensions list --enabled` prints them.
+      render: text
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Run `journalctl -f -o cat /usr/bin/gnome-shell`, reproduce the problem, and paste anything mentioning `hide-system-icons`.
+        For problems in the preferences window, use `journalctl -f -o cat /usr/bin/gjs` instead.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Optional. A screenshot of the panel or Quick Settings menu often helps.

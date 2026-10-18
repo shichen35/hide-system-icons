@@ -9,7 +9,7 @@
     "url": "git+https://github.com/shichen35/hide-system-icons.git"
   },
   "author": "Chen Shi <shichen35@gmail.com>",
-  "license": "LGPL-3.0-or-later",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/shichen35/hide-system-icons/issues"
   },
