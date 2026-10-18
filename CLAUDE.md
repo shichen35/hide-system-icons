@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A GNOME Shell extension that hides selected indicators (volume, mic, camera, network, power, etc.) from the Quick Settings panel, via per-indicator GSettings toggles. Ships as **two independent packages** built from one repo:
 
-- **Modern** (`*.ts` at repo root → `dist/`): GNOME Shell 45–50, ESM, TypeScript.
+- **Modern** (`*.ts` at repo root → `dist/`): GNOME Shell 45–51, ESM, TypeScript.
 - **Legacy** (`legacy/*.js` → `legacy-dist/`): GNOME Shell 40–44, the old `imports`-based extension loader, plain JS (cannot be TypeScript or ESM — the legacy loader doesn't support either).
 
 The two trees share the GSettings schema (`schemas/org.gnome.shell.extensions.hide-system-icons.gschema.xml`) and nothing else — no shared source, no shared build step. Changes to indicator behavior generally need to be made in both places.
@@ -17,7 +17,7 @@ The two trees share the GSettings schema (`schemas/org.gnome.shell.extensions.hi
 npm install                 # install dependencies (@girs/gjs, @girs/gnome-shell type defs)
 npm test                    # compile test-relevant modules + fakes, run node's test runner
 make pack                   # build both modern and legacy zips
-make pack-modern            # build dist/ + hide-system-icons-gnome-45-50.zip only
+make pack-modern            # build dist/ + hide-system-icons-gnome-45-51.zip only
 make pack-legacy            # build legacy-dist/ + hide-system-icons-gnome-40-44.zip only
 make install-modern         # pack-modern, then install to ~/.local/share/gnome-shell/extensions
 make install-legacy         # pack-legacy, then install to ~/.local/share/gnome-shell/extensions
@@ -71,7 +71,7 @@ prefs.ts               → preferences UI, built by iterating GROUPS/INDICATORS
 
 ## Before adding or changing an indicator
 
-Read `docs/indicator-availability.md` first. It's a field-by-field matrix of which QS/Aggregate Menu fields exist on which GNOME Shell version (40–50), read directly from GNOME Shell release source rather than assumed — it exists because a wrong `since` value on the power-profiles indicator once hid a working toggle from every user on GNOME 45–49. It also documents the two structural breaks that make version handling non-obvious: GNOME 43's Aggregate Menu → Quick Settings switch, and GNOME 45's `_volume` split into `_volumeOutput`/`_volumeInput`. Before 45, the legacy tree reaches the microphone icon one level deeper, at `_volume._inputIndicator` — the resolver in `legacy/extension.js` supports dotted field paths for exactly this.
+Read `docs/indicator-availability.md` first. It's a field-by-field matrix of which QS/Aggregate Menu fields exist on which GNOME Shell version (40–51), read directly from GNOME Shell release source rather than assumed — it exists because a wrong `since` value on the power-profiles indicator once hid a working toggle from every user on GNOME 45–49. It also documents the two structural breaks that make version handling non-obvious: GNOME 43's Aggregate Menu → Quick Settings switch, and GNOME 45's `_volume` split into `_volumeOutput`/`_volumeInput`. Before 45, the legacy tree reaches the microphone icon one level deeper, at `_volume._inputIndicator` — the resolver in `legacy/extension.js` supports dotted field paths for exactly this.
 
 ## Commit messages
 
