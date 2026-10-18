@@ -1,6 +1,6 @@
 {
   "name": "hide-system-icons",
-  "version": "0.0.5",
+  "version": "1.0.0",
   "description": "A GNOME Extension to hide system icons in the Quick Settings panel.",
   "type": "module",
   "private": true,

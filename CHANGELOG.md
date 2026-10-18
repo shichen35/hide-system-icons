@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Starting wi
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-18
+
 ### Added
 
 - Support for GNOME 51.
