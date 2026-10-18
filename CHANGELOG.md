@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file. Starting with 1.0.0, the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
