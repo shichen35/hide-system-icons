@@ -3,7 +3,7 @@ DOMAIN = shichen35.github.io
 UUID = $(NAME)@$(DOMAIN)
 EXT_DIR = ~/.local/share/gnome-shell/extensions/$(UUID)
 
-MODERN_ZIP = $(NAME)-gnome-45-50.zip
+MODERN_ZIP = $(NAME)-gnome-45-51.zip
 LEGACY_ZIP = $(NAME)-gnome-40-44.zip
 SCHEMAS = schemas/gschemas.compiled
 EXTRAS = README.md LICENSE

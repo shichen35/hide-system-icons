@@ -10,7 +10,7 @@ Install from GNOME Extensions: [Hide System Icons](https://extensions.gnome.org/
 
 ## Compatibility
 
-- Modern (ESM): GNOME Shell 45–50
+- Modern (ESM): GNOME Shell 45–51
 - Legacy (legacy loader): GNOME Shell 40–44
 
 ## Features
@@ -67,14 +67,14 @@ Prerequisites:
 ```bash
 npm install
 
-# Build both modern (45–50) and legacy (40–44) packages
+# Build both modern (45–51) and legacy (40–44) packages
 make pack
 
 # Or build individually
 make pack-modern
 make pack-legacy
 
-# Install the modern build (45–50) to ~/.local/share/gnome-shell/extensions
+# Install the modern build (45–51) to ~/.local/share/gnome-shell/extensions
 make install-modern
 
 # Install the legacy build (40–44) to ~/.local/share/gnome-shell/extensions
