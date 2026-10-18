@@ -17,8 +17,8 @@ The two trees share the GSettings schema (`schemas/org.gnome.shell.extensions.hi
 npm install                 # install dependencies (@girs/gjs, @girs/gnome-shell type defs)
 npm test                    # compile test-relevant modules + fakes, run node's test runner
 make pack                   # build both modern and legacy zips
-make pack-modern            # build dist/ + hide-system-icons-gnome-45-51.zip only
-make pack-legacy            # build legacy-dist/ + hide-system-icons-gnome-40-44.zip only
+make pack-modern            # build dist/ + hide-system-icons-<version>-gnome-45-51.zip only
+make pack-legacy            # build legacy-dist/ + hide-system-icons-<version>-gnome-40-44.zip only
 make install-modern         # pack-modern, then install to ~/.local/share/gnome-shell/extensions
 make install-legacy         # pack-legacy, then install to ~/.local/share/gnome-shell/extensions
 make clean                  # remove dist/, legacy-dist/, node_modules/, zips
@@ -72,6 +72,12 @@ prefs.ts               → preferences UI, built by iterating GROUPS/INDICATORS
 ## Before adding or changing an indicator
 
 Read `docs/indicator-availability.md` first. It's a field-by-field matrix of which QS/Aggregate Menu fields exist on which GNOME Shell version (40–51), read directly from GNOME Shell release source rather than assumed — it exists because a wrong `since` value on the power-profiles indicator once hid a working toggle from every user on GNOME 45–49. It also documents the two structural breaks that make version handling non-obvious: GNOME 43's Aggregate Menu → Quick Settings switch, and GNOME 45's `_volume` split into `_volumeOutput`/`_volumeInput`. Before 45, the legacy tree reaches the microphone icon one level deeper, at `_volume._inputIndicator` — the resolver in `legacy/extension.js` supports dotted field paths for exactly this.
+
+## Versioning and releases
+
+Semantic Versioning, with `package.json` `version` as the only source of the version. The build stamps it into the packaged `metadata.json` files as `version-name` (never into the source `metadata.json`s; extensions.gnome.org assigns the integer `version` itself) and into the zip names. Major: a GSettings key removed or renamed, or a GNOME version dropped. Minor: a new indicator, GNOME version or prefs feature. Patch: fixes only.
+
+New changelog entries go under `## [Unreleased]` in `CHANGELOG.md`. To release, run `npm version <patch|minor|major>` on a clean `main`: the `version` script (`scripts/release-changelog.mjs`) dates the Unreleased section, and `.npmrc` makes the commit `chore(release): vX.Y.Z` and tags it. `git push --follow-tags` then triggers `.github/workflows/release.yml`, which checks the tag against `package.json`, runs the tests, builds both zips and publishes a GitHub release with that version's changelog section as its notes. `.github/workflows/ci.yml` runs the tests and `make pack` on pushes to `main` and on pull requests.
 
 ## Commit messages
 

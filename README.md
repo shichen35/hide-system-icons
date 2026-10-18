@@ -81,6 +81,16 @@ make install-modern
 make install-legacy
 ```
 
+## Releasing
+
+The project follows [Semantic Versioning](https://semver.org/), and `package.json` holds the version.
+
+1. Add your changes under `## [Unreleased]` in `CHANGELOG.md`.
+2. On an up-to-date `main` with a clean working tree, run `npm version patch`, `npm version minor` or `npm version major`. This bumps the version, dates the changelog section, commits `chore(release): vX.Y.Z` and creates the `vX.Y.Z` tag.
+3. Run `git push --follow-tags`.
+
+Pushing the tag runs the release workflow. It builds `hide-system-icons-X.Y.Z-gnome-45-51.zip` and `hide-system-icons-X.Y.Z-gnome-40-44.zip` and publishes them as a GitHub release, with the changelog section as the release notes. Uploading to extensions.gnome.org is still manual.
+
 ## License
 
 MIT — see `LICENSE`.
