@@ -20,8 +20,8 @@
     "version": "node scripts/release-changelog.mjs && git add CHANGELOG.md"
   },
   "devDependencies": {
-    "eslint": "^10.14.0",
-    "eslint-plugin-jsdoc": "^65.4.5",
+    "eslint": "^10.15.0",
+    "eslint-plugin-jsdoc": "^65.5.0",
     "typescript": "^7.0.2"
   },
   "dependencies": {
